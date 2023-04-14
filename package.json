@@ -2,7 +2,7 @@
   "name": "@o3r/framework",
   "private": true,
   "version": "0.0.0-placeholder",
-  "description": "O mtt er Fr amewo rk ",
+  "description": "O mtt er F r amewo rk ",
   "scripts": {
     "nx": "nx",
     "ng": "yarn nx",
