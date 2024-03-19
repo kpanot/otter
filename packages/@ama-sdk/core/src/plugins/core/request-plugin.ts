@@ -1,4 +1,4 @@
-import { Plugin, PluginRunner } from './plugin';
+import type { Plugin, PluginContext, PluginRunner } from './plugin';
 
 export type RequestBody = string | FormData;
 
@@ -33,6 +33,8 @@ export interface RequestMetadata<C extends string = string, A extends string = s
   headerContentType?: C;
   /** Force a MIME type to be used as Accept header */
   headerAccept?: A;
+  /** Signal to abort the request */
+  signal?: AbortSignal;
 }
 
 export interface RequestOptions extends RequestInit {
@@ -48,13 +50,23 @@ export interface RequestOptions extends RequestInit {
   tokenizedOptions?: TokenizedOptions;
   /** Request metadata */
   metadata?: RequestMetadata;
+  /** @inheritdoc */
+  method: NonNullable<RequestInit['method']>;
 }
+
+/**
+ * Interface of an SDK request plugin context.
+ */
+export interface RequestPluginContext extends PluginContext {}
 
 /**
  * Interface of an SDK request plugin.
  * The plugin will be run on the request of a call
  */
 export interface RequestPlugin extends Plugin<RequestOptions, RequestOptions> {
-  /** Load the plugin with the context */
-  load(): PluginRunner<RequestOptions, RequestOptions>;
+  /**
+   * Load the plugin with the context
+   * @param context Context of request plugin
+   */
+  load(context?: RequestPluginContext): PluginRunner<RequestOptions, RequestOptions>;
 }

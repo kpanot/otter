@@ -1,11 +1,12 @@
-import {BuilderContext, BuilderOutput, createBuilder} from '@angular-devkit/architect';
+import { BuilderContext, BuilderOutput, createBuilder } from '@angular-devkit/architect';
+import { createBuilderWithMetricsIfInstalled } from '@o3r/extractors';
 import * as fs from 'node:fs';
 import { sync as globbySync } from 'globby';
 import * as path from 'node:path';
 
 import {I18nBuilderSchema} from './schema';
 
-export default createBuilder<I18nBuilderSchema>((options: I18nBuilderSchema, context: BuilderContext): BuilderOutput => {
+export default createBuilder(createBuilderWithMetricsIfInstalled<I18nBuilderSchema>((options: I18nBuilderSchema, context: BuilderContext): BuilderOutput => {
   const posixWorkspaceRoot = context.workspaceRoot.split(path.sep).join(path.posix.sep);
 
   options.localizationConfigs.forEach((config) => {
@@ -35,12 +36,12 @@ export default createBuilder<I18nBuilderSchema>((options: I18nBuilderSchema, con
         });
       }
 
-      const enGB = path.join(i18nPath, options.defaultLanguageFile);
-      fs.writeFileSync(enGB, newContent);
+      const defaultLanguageFile = path.join(i18nPath, options.defaultLanguageFile);
+      fs.writeFileSync(defaultLanguageFile, newContent + '\n');
     });
   });
 
   return {
     success: true
   };
-});
+}));

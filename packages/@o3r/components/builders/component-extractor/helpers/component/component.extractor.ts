@@ -2,16 +2,16 @@ import { logging } from '@angular-devkit/core';
 import type {
   ComponentClassOutput,
   ComponentConfigOutput,
-  ComponentModuleOutput,
   ComponentOutput,
-  ComponentStructure, PlaceholdersMetadata
+  ComponentStructure, ConfigProperty, PlaceholdersMetadata
 } from '@o3r/components';
-import { CmsMedataData, getLibraryCmsMetadata } from '@o3r/extractors';
+import { CmsMetadataData, getLibraryCmsMetadata } from '@o3r/extractors';
+import { O3rCliError } from '@o3r/schematics';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ComponentExtractorBuilderSchema } from '../../index';
 import { ComponentInformation } from './component-class.extractor';
-import { ConfigurationInformation } from './component-config.extractor';
+import { ConfigurationInformation, ConfigurationInformationWrapper } from './component-config.extractor';
 import { ParserOutput } from './component.parser';
 
 /**
@@ -20,7 +20,7 @@ import { ParserOutput } from './component.parser';
 export class ComponentExtractor {
 
   /** List of libraries to extract component metadata from */
-  private libraries: CmsMedataData[];
+  private readonly libraries: CmsMetadataData[];
 
   /** List of loaded libraries configurations */
   private libConfigurations?: ComponentConfigOutput[][];
@@ -28,16 +28,14 @@ export class ComponentExtractor {
   /** List of the loaded libraries component outputs*/
   private libComponentClassOutputs?: ComponentClassOutput[][];
 
-  /** List of extracted modules */
-  private modules?: { [component: string]: ComponentModuleOutput };
-
   /**
    * @param libraryName The name of the library/app on which the extractor is run
    * @param libraries List of libraries to extract metadata from
    * @param logger
    * @param workspaceRoot
+   * @param strictMode
    */
-  constructor(private libraryName: string, libraries: string[], private logger: logging.LoggerApi, private workspaceRoot: string) {
+  constructor(private readonly libraryName: string, libraries: string[], private readonly logger: logging.LoggerApi, private readonly workspaceRoot: string, private readonly strictMode = false) {
     this.libraries = libraries
       .map((lib) => getLibraryCmsMetadata(lib, ''));
   }
@@ -99,12 +97,40 @@ export class ComponentExtractor {
   }
 
   /**
+   * Return a hash of the config output without the path
+   *
+   * @param config
+   */
+  private hashConfiguration(config: ComponentConfigOutput) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { path: configFilePath, ...rest } = config;
+    return Buffer.from(JSON.stringify(rest)).toString('base64');
+  }
+
+  /**
+   * Add NestedConfiguration to map
+   *
+   * @param nestedConfigurations Map
+   * @param configurationInformationWrapper configurations to be added
+   * @param filePath
+   */
+  private addNestedConfigToMap(nestedConfigurations: Map<string, ComponentConfigOutput>, configurationInformationWrapper: ConfigurationInformationWrapper, filePath: string) {
+    configurationInformationWrapper.nestedConfiguration.forEach(
+      (nestedConfiguration) => {
+        const value = this.createComponentConfigOutput(nestedConfiguration, filePath, 'NESTED_ELEMENT');
+        nestedConfigurations.set(this.hashConfiguration(value), value);
+      }
+    );
+    return nestedConfigurations;
+  }
+
+  /**
    * Consolidate the configuration data to the final format.
    *
    * @param parsedData Data extracted from the source code
    */
   private consolidateConfig(parsedData: ParserOutput): ComponentConfigOutput[] {
-    const nestedConfigurations: ComponentConfigOutput[] = [];
+    const nestedConfigurations = new Map<string, ComponentConfigOutput>();
     const configMap: Map<string, ComponentConfigOutput> = new Map();
 
     // extract Application type configs that are not supposed to be bound to a component
@@ -113,11 +139,8 @@ export class ComponentExtractor {
       if (configurationInformation && configurationInformation.isApplicationConfig) {
         this.logger.info(`Processing standalone APPLICATION config: ${configurationInformation.name}.`);
         configMap.set(filePath, this.createComponentConfigOutput(configurationInformation, filePath, 'APPLICATION'));
-
-        nestedConfigurations.push(...configuration.configuration.nestedConfiguration.map(
-          (nestedConfiguration) => this.createComponentConfigOutput(nestedConfiguration, filePath, 'NESTED_ELEMENT')
-        ));
       }
+      this.addNestedConfigToMap(nestedConfigurations, configuration.configuration, filePath);
     });
 
     Object.keys(parsedData.components)
@@ -133,38 +156,18 @@ export class ComponentExtractor {
             return;
           }
         }
-        // We add all nested config in a dedicated list here
-        nestedConfigurations.push(...configRef.configuration.nestedConfiguration.map(
-          (nestedConfiguration) => this.createComponentConfigOutput(nestedConfiguration, configRef.file, 'NESTED_ELEMENT')
-        ));
-        return this.createComponentConfigOutput(configRef.configuration.configurationInformation!, configRef.file, parsedItemRef.component.type);
+        // We add all nested config in a dedicated map here
+        this.addNestedConfigToMap(nestedConfigurations, configRef.configuration, configRef.file);
+        if (!configRef.configuration.configurationInformation) {
+          return;
+        }
+        return this.createComponentConfigOutput(configRef.configuration.configurationInformation, configRef.file, parsedItemRef.component.type);
       }).filter((config): config is ComponentConfigOutput => !!config)
       .forEach((config) =>
         // Here we filter any duplicates using the path, it's possible to reuse a config for 2 components, but we don't it 2 times in the output
         configMap.set(config.path, config)
       );
-    return [...Array.from(configMap.values()), ...nestedConfigurations];
-  }
-
-  /**
-   * Consolidate the modules data to the final format.
-   *
-   * @param parsedData Data extracted from the source code
-   */
-  private consolidateModules(parsedData: ParserOutput) {
-    return Object.keys(parsedData.modules)
-      .reduce((acc, moduleUrl): { [key: string]: ComponentModuleOutput } => {
-        const parsedItemRef = parsedData.modules[moduleUrl];
-
-        parsedItemRef.module.exportedItems.forEach((exportedItem) => {
-          acc[exportedItem] = {
-            name: parsedItemRef.module.name,
-            path: moduleUrl
-          };
-        });
-
-        return acc;
-      }, {});
+    return [...Array.from(configMap.values()), ...Array.from(nestedConfigurations.values())];
   }
 
   /**
@@ -179,7 +182,6 @@ export class ComponentExtractor {
     const res: ComponentClassOutput[] = Object.keys(parsedData.components)
       .map((componentUrl): ComponentClassOutput => {
         const parsedItemRef = parsedData.components[componentUrl];
-        const module = this.modules ? this.modules[parsedItemRef.component.name] : undefined;
         const context = parsedItemRef.component.contextName ? {
           library,
           name: parsedItemRef.component.contextName
@@ -192,16 +194,12 @@ export class ComponentExtractor {
           library,
           name: parsedItemRef.component.name,
           path: path.relative(this.workspaceRoot, parsedItemRef.file),
-          templatePath: parsedItemRef.component.templateUrl ?
-            path.relative(this.workspaceRoot, path.join(path.dirname(parsedItemRef.file), parsedItemRef.component.templateUrl.replace(/[\\/]/g, '/'))) :
-            '',
-          moduleName: module ? module.name : '',
-          modulePath: module ? path.relative(this.workspaceRoot, module.path) : '',
           selector: parsedItemRef.component.selector || '',
           type: parsedItemRef.component.type,
           context,
           config,
-          linkableToRuleset: parsedItemRef.component.linkableToRuleset
+          linkableToRuleset: parsedItemRef.component.linkableToRuleset,
+          localizationKeys: parsedItemRef.component.localizationKeys
         };
 
       });
@@ -237,19 +235,44 @@ export class ComponentExtractor {
     if (!options.exposedComponentSupport) {
       supportedTypes.delete('EXPOSED_COMPONENT');
     }
-    return configs.filter((config) => {
+    return configs.reduce((acc: ComponentConfigOutput[], config) => {
       if (!supportedTypes.has(config.type)) {
         this.logger.warn(`Config type "${config.type}" is not supported for ${config.library}#${config.name}. Excluding it`);
-        return false;
+        return acc;
       }
 
-      if (config.properties.some((property) => property.values === undefined && property.value === undefined)) {
-        this.logger.warn(`At least one property in "${config.library}#${config.name}" has no default value. Excluding it`);
-        return false;
+      const { propertiesWithDefaultValue, propertiesWithoutDefaultValue } = config.properties.reduce((properties: {
+        propertiesWithDefaultValue: ConfigProperty[];
+        propertiesWithoutDefaultValue: ConfigProperty[];
+      }, property) => {
+        if (property.values === undefined && property.value === undefined) {
+          properties.propertiesWithoutDefaultValue = properties.propertiesWithoutDefaultValue.concat(property);
+        } else {
+          properties.propertiesWithDefaultValue = properties.propertiesWithDefaultValue.concat(property);
+        }
+        return properties;
+      }, {
+        propertiesWithDefaultValue: [],
+        propertiesWithoutDefaultValue: []
+      });
+      if (propertiesWithoutDefaultValue.length) {
+        const message = `"${config.library}#${config.name}" has no default value for ${
+          propertiesWithoutDefaultValue.map((prop) => prop.name).join(', ')
+        }. Excluding ${propertiesWithoutDefaultValue.length > 1 ? 'them' : 'it'}`;
+        if (!this.strictMode) {
+          this.logger.warn(message);
+        } else {
+          throw new O3rCliError(message);
+        }
+        const configWithoutIncompatibleProperties: ComponentConfigOutput = {
+          ...config,
+          properties: propertiesWithDefaultValue
+        };
+        return acc.concat(configWithoutIncompatibleProperties);
       }
 
-      return true;
-    });
+      return acc.concat(config);
+    }, []);
 
   }
 
@@ -265,8 +288,9 @@ export class ComponentExtractor {
     (this.libConfigurations || [])
       .forEach((configs) => configurations.push(...configs));
     configurations = this.filterIncompatibleConfig(configurations, options);
-
-    this.modules = this.consolidateModules(parserOutput);
+    configurations = Array.from((new Map(configurations.map((c) => {
+      return [this.hashConfiguration(c), c];
+    }))).values());
 
     let placeholderMetadataFile;
     if (options.placeholdersMetadataFilePath) {

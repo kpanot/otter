@@ -1,6 +1,7 @@
 import { BuilderOutput, createBuilder } from '@angular-devkit/architect';
 import type { ComponentConfigOutput } from '@o3r/components';
-import { CmsMedataData, getLibraryCmsMetadata, validateJson } from '@o3r/extractors';
+import { CmsMetadataData, createBuilderWithMetricsIfInstalled, getLibraryCmsMetadata, validateJson } from '@o3r/extractors';
+import { O3rCliError } from '@o3r/schematics';
 import * as chokidar from 'chokidar';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -13,7 +14,6 @@ export * from './schema';
 
 /**
  * Get the library name from package.json
- *
  * @param currentDir
  */
 export const defaultLibraryName = (currentDir: string = process.cwd()): string => {
@@ -26,7 +26,6 @@ const STEP_NUMBER = 5;
 
 /**
  * Ensure that all tuple (library,name) are unique
- *
  * @param configurations
  * @param strictMode
  */
@@ -42,19 +41,19 @@ function checkUniquenessLibraryAndName(configurations: ComponentConfigOutput[], 
   });
   if (errors.length) {
     if (strictMode) {
-      throw new Error(`Duplicate (library, name) tuples are not allowed :\n ${errors}`);
+      throw new O3rCliError(`Duplicate (library, name) tuples are not allowed :\n ${errors}`);
     }
     console.warn(`Duplicate (library, name) tuples found. Please fix it as it would throw an error in strict mode :\n ${errors}`);
   }
 }
 
-export default createBuilder<ComponentExtractorBuilderSchema>(async (options, context): Promise<BuilderOutput> => {
+export default createBuilder(createBuilderWithMetricsIfInstalled<ComponentExtractorBuilderSchema>(async (options, context): Promise<BuilderOutput> => {
   context.reportRunning();
 
   const execute = async (): Promise<BuilderOutput> => {
     context.reportProgress(0, STEP_NUMBER, 'Checking required options');
     const tsConfig = path.resolve(context.workspaceRoot, options.tsConfig);
-    const tsconfigExists = await new Promise<boolean>((resolve) => fs.exists(tsConfig, resolve));
+    const tsconfigExists = fs.existsSync(tsConfig);
     if (!tsconfigExists) {
       context.logger.error(`${tsConfig} not found`);
 
@@ -66,7 +65,7 @@ export default createBuilder<ComponentExtractorBuilderSchema>(async (options, co
 
     context.reportProgress(1, STEP_NUMBER, 'Generating component parser');
     const libraryName = options.name || defaultLibraryName(context.currentDirectory);
-    const parser = new ComponentParser(libraryName, tsConfig, context.logger, options.strictMode);
+    const parser = new ComponentParser(libraryName, tsConfig, context.logger, options.strictMode, options.libraries, options.globalConfigCategories);
 
     context.reportProgress(2, STEP_NUMBER, 'Gathering project data');
     const parserOutput = await parser.parse();
@@ -77,20 +76,26 @@ export default createBuilder<ComponentExtractorBuilderSchema>(async (options, co
         error: 'Parsing failed'
       };
     } else {
-      const componentExtractor = new ComponentExtractor(libraryName, options.libraries, context.logger, context.workspaceRoot);
+      const componentExtractor = new ComponentExtractor(libraryName, options.libraries, context.logger, context.workspaceRoot, options.strictMode);
       try {
         context.reportProgress(3, STEP_NUMBER, 'Extracting component metadata');
         const componentMetadata = await componentExtractor.extract(parserOutput, options);
 
         // Validate configuration part of components metadata
-        validateJson(componentMetadata.configurations, require(require.resolve('@o3r/configuration/schemas/configuration.metadata.schema.json')),
+        validateJson(
+          componentMetadata.configurations,
+          require('@o3r/configuration/schemas/configuration.metadata.schema.json'),
           'The output of configuration metadata is not valid regarding the json schema, please check the details below : \n',
-          options.strictMode);
+          options.strictMode
+        );
 
         // Validate components part of components metadata
-        validateJson(componentMetadata.components, require(path.resolve(__dirname, '..', '..', 'schemas', 'component.metadata.schema.json')),
+        validateJson(
+          componentMetadata.components,
+          require('../../schemas/component.metadata.schema.json'),
           'The output of components metadata is not valid regarding the json schema, please check the details below : \n',
-          options.strictMode);
+          options.strictMode
+        );
 
         // Ensure that each tuple (library,name) is unique
         checkUniquenessLibraryAndName(componentMetadata.configurations);
@@ -99,21 +104,15 @@ export default createBuilder<ComponentExtractorBuilderSchema>(async (options, co
         try {
           await fs.promises.mkdir(path.dirname(path.resolve(context.workspaceRoot, options.componentOutputFile)), {recursive: true});
         } catch {}
-        await new Promise<void>((resolve, reject) =>
-          fs.writeFile(
-            path.resolve(context.workspaceRoot, options.componentOutputFile),
-            options.inline ? JSON.stringify(componentMetadata.components) : JSON.stringify(componentMetadata.components, null, 2),
-            (err) => err ? reject(err) : resolve()
-          )
+        await fs.promises.writeFile(
+          path.resolve(context.workspaceRoot, options.componentOutputFile),
+          options.inline ? JSON.stringify(componentMetadata.components) : JSON.stringify(componentMetadata.components, null, 2)
         );
 
         context.reportProgress(5, STEP_NUMBER, `Writing configurations in ${options.configOutputFile}`);
-        await new Promise<void>((resolve, reject) =>
-          fs.writeFile(
-            path.resolve(context.workspaceRoot, options.configOutputFile),
-            options.inline ? JSON.stringify(componentMetadata.configurations) : JSON.stringify(componentMetadata.configurations, null, 2),
-            (err) => err ? reject(err) : resolve()
-          )
+        await fs.promises.writeFile(
+          path.resolve(context.workspaceRoot, options.configOutputFile),
+          options.inline ? JSON.stringify(componentMetadata.configurations) : JSON.stringify(componentMetadata.configurations, null, 2)
         );
       } catch (e: any) {
         return {
@@ -133,7 +132,6 @@ export default createBuilder<ComponentExtractorBuilderSchema>(async (options, co
 
   /**
    * Run a component metadata generation and report the result
-   *
    * @param filename File that has changed and requires a regeneration
    */
   const generateWithReport = async () => {
@@ -150,19 +148,20 @@ export default createBuilder<ComponentExtractorBuilderSchema>(async (options, co
 
   /**
    * Watch file change in current code and libraries metadata
-   *
    * @param libraries Libraries to watch
    */
   const watchFiles = (libraries: string[]): chokidar.FSWatcher => {
     // TODO find a better way to watch files
     const simpleGlobConfigurationFiles = path.resolve(context.currentDirectory, options.filePattern).replace(/[\\/]/g, '/');
     // Get metadata file for each library
-    const metadataFiles: CmsMedataData[] = libraries.map((library) => getLibraryCmsMetadata(library, context.currentDirectory));
+    const metadataFiles: CmsMetadataData[] = libraries.map((library) => getLibraryCmsMetadata(library, context.currentDirectory));
     const componentMetadataFiles = metadataFiles
       .filter(({ componentFilePath }) => !!componentFilePath)
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       .map(({ componentFilePath }) => componentFilePath!.replace(/[\\/]/g, '/'));
     const configurationMetadataFiles = metadataFiles
       .filter(({ configurationFilePath }) => !!configurationFilePath)
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
       .map(({ configurationFilePath }) => configurationFilePath!.replace(/[\\/]/g, '/'));
 
     return chokidar.watch([...componentMetadataFiles, ...configurationMetadataFiles, simpleGlobConfigurationFiles]);
@@ -194,4 +193,4 @@ export default createBuilder<ComponentExtractorBuilderSchema>(async (options, co
         .on('error', (err) => reject(err))
     );
   }
-});
+}));

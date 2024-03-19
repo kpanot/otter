@@ -2,13 +2,13 @@
 import { getTestBed, TestBed } from '@angular/core/testing';
 import { BrowserDynamicTestingModule, platformBrowserDynamicTesting } from '@angular/platform-browser-dynamic/testing';
 import { Dictionary } from '@ngrx/entity';
-import { Configuration } from '@o3r/core';
+import type { Configuration } from '@o3r/core';
 import {
   clearConfigurationEntities, updateConfigurationEntities, updateConfigurationEntity, upsertConfigurationEntities,
   upsertConfigurationEntity
 } from './configuration.actions';
 import { configurationAdapter, configurationInitialState, configurationReducer } from './configuration.reducer';
-import { ConfigurationModel } from './configuration.state';
+import type { ConfigurationModel } from './configuration.state';
 
 interface MyConfigToTest extends Configuration {
   fieldNumber: number;
@@ -53,7 +53,7 @@ const updatedComponentsConfiguration = {
   MY_SECOND_COMPONENT: mySecondUpdateConfiguration
 };
 
-const componentsConfigurationsModel = Object.keys(componentsConfigurations).map((id) => ({id, ...componentsConfigurations[id]}));
+const componentsConfigurationsModel = (Object.keys(componentsConfigurations) as (keyof typeof updatedComponentsConfiguration)[]).map((id) => ({id, ...componentsConfigurations[id]}));
 
 const getEntity = (entities: Dictionary<ConfigurationModel>, entityId: string): ConfigurationModel | undefined => entities[entityId];
 

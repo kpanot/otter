@@ -1,23 +1,23 @@
 import { BehaviorSubject, Subject } from 'rxjs';
-import { RulesEngineService } from '../services/rules-engine.service';
+import { RulesEngineRunnerService } from '../services/runner/rules-engine.runner.service';
 import { FactsService } from './fact.abstract-service';
 
 
 class FakeFactsService extends FactsService<any> {
-  constructor(rulesEngine: RulesEngineService, public facts: any) {
+  constructor(rulesEngine: RulesEngineRunnerService, public facts: any) {
     super(rulesEngine);
   }
 }
 
 describe('Rules engine fact', () => {
-  let mockEngine: RulesEngineService;
+  let mockEngine: RulesEngineRunnerService;
   let factsService: FactsService<any>;
   let subjectFact: Subject<string>;
 
   beforeEach(() => {
     mockEngine = {
       upsertFacts: jest.fn()
-    } as any as RulesEngineService;
+    } as any as RulesEngineRunnerService;
     subjectFact = new BehaviorSubject<string>('test3');
     const facts = {
       basicFact: 'test1',
@@ -29,16 +29,16 @@ describe('Rules engine fact', () => {
 
   it('should register the facts', async () => {
     factsService.register();
-    await new Promise<void>((resolve) => setTimeout(() => resolve(), 0));
+    await jest.runAllTimersAsync();
 
     expect(mockEngine.upsertFacts).toHaveBeenCalledTimes(1);
   });
 
   it('should update the value of a fact', async () => {
     factsService.register();
-    await new Promise<void>((resolve) => setTimeout(() => resolve(), 0));
+    await jest.runAllTimersAsync();
     subjectFact.next('test4');
-    await new Promise<void>((resolve) => setTimeout(() => resolve(), 0));
+    await jest.runAllTimersAsync();
 
     expect(mockEngine.upsertFacts).toHaveBeenCalledTimes(1);
   });

@@ -1,0 +1,80 @@
+{
+  "name": "ama-sdk-schematics",
+  "$schema": "https://raw.githubusercontent.com/nrwl/nx/master/packages/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "packages/@ama-sdk/schematics/src",
+  "prefix": "o3r",
+  "targets": {
+    "build": {
+      "executor": "nx:noop",
+      "dependsOn": ["build-builders"]
+    },
+    "prepare-build-builders": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "prepare:build:builders"
+      },
+      "outputs": [
+        "{projectRoot}/dist/package.json",
+        "{projectRoot}/dist/builders.json",
+        "{projectRoot}/dist/migration.json",
+        "{projectRoot}/dist/collection.json",
+        "{projectRoot}/dist/builders/**/*.json",
+        "{projectRoot}/dist/schemas/**/*.json",
+        "{projectRoot}/dist/schematics/**/*.json",
+        "{projectRoot}/dist/schematics/**/*.jar",
+        "{projectRoot}/dist/schematics/**/templates/**"
+      ]
+    },
+    "build-builders": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "build:builders"
+      }
+    },
+    "lint": {
+      "options": {
+        "eslintConfig": "packages/@ama-sdk/schematics/.eslintrc.js",
+        "lintFilePatterns": ["packages/@ama-sdk/schematics/schematics/**/*.ts"]
+      }
+    },
+    "build-swagger": {
+      "executor": "nx:run-script",
+      "inputs": [
+        "global",
+        "{projectRoot}/schematics/**",
+        "!{projectRoot}/schematics/**/target/**"
+      ],
+      "outputs": ["{projectRoot}/schematics/**/target/*.jar"],
+      "options": {
+        "script": "build:swagger"
+      }
+    },
+    "test": {
+      "executor": "@nx/jest:jest",
+      "options": {
+        "jestConfig": "packages/@ama-sdk/schematics/jest.config.js"
+      }
+    },
+    "test-int": {
+      "executor": "@nx/jest:jest",
+      "options": {
+        "jestConfig": "packages/@ama-sdk/schematics/testing/jest.config.it.js",
+        "passWithNoTests": true
+      }
+    },
+    "prepare-publish": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "prepare:publish"
+      }
+    },
+    "publish": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npm publish packages/@ama-sdk/schematics/dist"
+      }
+    }
+  },
+  "tags": []
+}

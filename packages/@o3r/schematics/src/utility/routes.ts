@@ -1,5 +1,5 @@
-import { SchematicContext, Tree } from '@angular-devkit/schematics';
-import * as ts from '@schematics/angular/third_party/github.com/Microsoft/TypeScript/lib/typescript';
+import type { SchematicContext, Tree } from '@angular-devkit/schematics';
+import * as ts from 'typescript';
 
 /**
  * Route definition.
@@ -17,7 +17,6 @@ export interface Route {
 
 /**
  * Indicates if the given Route expression has the given path.
- *
  * @param route Route expression
  * @param path Path to test
  */
@@ -31,7 +30,6 @@ function hasRoutePath(route: ts.ObjectLiteralExpression, path: string): boolean 
 
 /**
  * Indicates if the given variable declaration is a Routes declaration.
- *
  * @param declaration Declaration to test
  */
 function isRoutesDeclaration(declaration: ts.VariableDeclaration): boolean {
@@ -50,7 +48,6 @@ function isRoutesDeclaration(declaration: ts.VariableDeclaration): boolean {
 
 /**
  * Get the Routes variable declaration from the given App Routing Module path.
- *
  * @param tree File tree
  * @param context Context of the rule
  * @param appRoutingModulePath Path of the App Routing Module
@@ -82,7 +79,6 @@ export function getRoutesDeclaration(tree: Tree, context: SchematicContext, appR
 
 /**
  * Gets the Routes Node array of the App Routing Module of the given path.
- *
  * @param tree File tree
  * @param context Context of the rule
  * @param appRoutingModulePath
@@ -114,19 +110,19 @@ export function getRoutesNodeArray(tree: Tree, context: SchematicContext, appRou
 
 /**
  * Inserts a route in the App Routing Module of the given path.
- *
  * @param tree File tree
  * @param context Context of the rule
  * @param appRoutingModulePath Path of the App Routing Module
  * @param route The Route to insert
+ * @param standalone Whether the page component is standalone
  */
-export function insertRoute(tree: Tree, context: SchematicContext, appRoutingModulePath: string, route: Route) {
+export function insertRoute(tree: Tree, context: SchematicContext, appRoutingModulePath: string, route: Route, standalone = false) {
   const routes = getRoutesNodeArray(tree, context, appRoutingModulePath);
 
   if (routes) {
     const noStarRoutes = routes.filter((r) => !hasRoutePath(r, '**'));
     const index = noStarRoutes.length >= 1 ? noStarRoutes[noStarRoutes.length - 1].end : routes.end;
-    const routeString = `{path: '${route.path}', loadChildren: () => import('${route.import}').then((m) => m.${route.module})}`;
+    const routeString = `{path: '${route.path}', load${standalone ? 'Component' : 'Children'}: () => import('${route.import}').then((m) => m.${route.module})}`;
     const content = noStarRoutes.length >= 1 ? `,\n${routeString}` : routeString;
 
     const recorder = tree.beginUpdate(appRoutingModulePath);

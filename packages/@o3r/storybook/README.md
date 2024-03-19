@@ -1,8 +1,23 @@
-# Otter storybook
+<h1 align="center">Otter storybook</h1>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/AmadeusITGroup/otter/main/assets/logo/otter.png" alt="Super cute Otter!" width="40%"/>
+</p>
 
 This package is an [Otter Framework Module](https://github.com/AmadeusITGroup/otter/tree/main/docs/core/MODULE.md).
+<br />
+<br />
+
+## Description
+
+[![Status](https://img.shields.io/badge/status-deprecated-red)](https://www.npmjs.com/package/@o3r/storybook)
+[![Stable Version](https://img.shields.io/npm/v/@o3r/storybook)](https://www.npmjs.com/package/@o3r/storybook)
+[![Bundle Size](https://img.shields.io/bundlephobia/min/@o3r/storybook?color=green)](https://www.npmjs.com/package/@o3r/storybook)
 
 The Otter Framework provides several tools for Otter based projects.
+
+> [!CAUTION]
+> **Deprecated package**
+> `@o3r/storybook` package is deprecated and will no longer be updated as of Otter v12.
 
 ## Description
 
@@ -31,20 +46,6 @@ Storybook will require 2 files in the folder `.storybook` added into the root fo
 - **preview.js**: set of functions and default configurations used by the Storybook before displaying a component preview. This is used by Otter to load metadata (configuration, localization and styling) to set up the component controllers and integrate localization into the display.
 
 > For more documentation regarding the Storybook setup, your can refer to [Storybook documentation](https://storybook.js.org/docs/react/configure/overview).
-
-To generate a basic story when generating a new component, the configuration `useStorybook` will be added into the *angular.json* file.
-
-## Component generator
-
-The Otter component generator (from `@o3r/core`) will generate the `<component>.stories.ts` file if the parameter `useStorybook` from the *angular.json* is detected. The parameter can be also overridden by the `--useStorybook` option of the generator.
-
-The generated story will come with the following supported feature:
-
-- **Localization**: default translation will be displayed on the previewed component.
-- **Dynamic Configuration**: controllers to manage the configurations will be generated.
-- **Styling**: controllers to modify the theme (global level and component level) will be generated.
-
-> See [Story Helpers section](#stories-helpers) for more explanations.
 
 ## Otter AddOns
 

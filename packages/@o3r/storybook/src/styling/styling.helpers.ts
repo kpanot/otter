@@ -7,7 +7,6 @@ const colorRegExp = /^(#[a-fA-F0-9]{3,8}|rgba?\([^)]+\))\s*;?$/;
 
 /**
  * Inject CSS variable into the DOM
- *
  * @param variableName Variable name
  * @param value Value of the CSS variable
  * @param styleElementId ID of the HTML Style element where to inject the css variable
@@ -36,7 +35,6 @@ export function setCssVariable(variableName: string, value: string, styleElement
 
 /**
  * Get Argument type based on CSS variable type
- *
  * @param data CSS Variable
  * @param metadata CSS Style Metadata
  * @param mem
@@ -50,7 +48,7 @@ export function getTypeAndValue(data: CssVariable, metadata: CssMetadata, mem: s
   }
   if (data.references && data.references.length === 1 && /^var *\(.*\)$/.test(data.defaultValue)) {
     const referTo = data.references[0].name;
-    if (metadata[referTo]) {
+    if (metadata.variables[referTo]) {
       const isCircular = mem.includes(referTo);
       mem.push(referTo);
       if (isCircular) {
@@ -63,7 +61,7 @@ export function getTypeAndValue(data: CssVariable, metadata: CssMetadata, mem: s
         };
       } else {
         return {
-          ...getTypeAndValue(metadata[referTo], metadata, mem),
+          ...getTypeAndValue(metadata.variables[referTo], metadata, mem),
           referTo
         };
       }
@@ -85,12 +83,11 @@ export function getTypeAndValue(data: CssVariable, metadata: CssMetadata, mem: s
 
 /**
  * Extract storybook argument type base for component styling
- *
  * @param prefix Component prefix for CSS variable
  * @param metadata CSS Style Metadata
  */
 export function extractStyling(prefix = '', metadata: CssMetadata = getStyleMetadata()): StyleConfigs {
-  return Object.entries(metadata)
+  return Object.entries(metadata.variables)
     .filter(([name]) => name.startsWith(prefix))
     .reduce<StyleConfigs>((acc, [name, data]) => {
       const { type, value, referTo } = getTypeAndValue(data, metadata);
@@ -113,7 +110,6 @@ export function extractStyling(prefix = '', metadata: CssMetadata = getStyleMeta
 
 /**
  * Apply component style and theme to the loaded component
- *
  * @param style Component style
  * @param props Properties set to storybook control
  * @param theme Application theme
@@ -135,11 +131,10 @@ export function applyStyle(style: StyleConfigs, props: any, theme?: Record<strin
 
 /**
  * Get theme from metadata
- *
  * @param metadata CSS Style Metadata
  */
 export function getThemeVariables(metadata: CssMetadata = getStyleMetadata()) {
-  return Object.entries(metadata)
+  return Object.entries(metadata.variables)
     .filter(([_, data]) => data.tags && data.tags.indexOf('theme') > -1)
     .reduce<Record<string, string>>((acc, [name, data]) => {
       acc[name] = data.defaultValue;

@@ -4,6 +4,8 @@ import type { PackageJson } from 'type-fest';
 export interface PackageConfiguration {
   /** List of ignored dependencies */
   ignore?: string[];
+  /** Ignore the update of the package manager version */
+  ignorePackageManager?: boolean;
   /** Determine if this package should be ignored */
   skipPackage?: boolean;
 }
@@ -41,25 +43,25 @@ export interface Options {
   /**
    * Enforce to align the version of the dependencies with the latest range.
    * If not set, the version will be aligned with the latest range if the latest range is not intersected with the current range.
-   *
    * @default false
    */
   alignPeerDependencies: boolean;
 
   /**
    * Display debug logs
-   *
    * @default false
    */
   verbose: boolean;
 
   /**
    * List of dependency types to update, comma separated
-   *
    * @default ['optionalDependencies', 'dependencies', 'devDependencies', 'peerDependencies', 'generatorDependencies']
    */
   dependencyTypes: string[];
 
   /** Path to the private package.json of the monorepo */
   monorepo: string;
+
+  /** List of patterns of files to which apply the new calculated version without implicating them in the version determination */
+  applyTo: string[];
 }

@@ -7,20 +7,14 @@
   "targets": {
     "build": {
       "executor": "nx:noop",
-      "dependsOn": [
-        "build-builders",
-        "compile"
-      ]
+      "dependsOn": ["build-builders", "compile"]
     },
     "compile": {
       "executor": "@angular-devkit/build-angular:ng-packagr",
       "options": {
         "project": "packages/@o3r/apis-manager/ng-package.json",
         "tsConfig": "packages/@o3r/apis-manager/tsconfig.build.json"
-      },
-      "dependsOn": [
-        "^build"
-      ]
+      }
     },
     "prepare-build-builders": {
       "executor": "nx:run-script",
@@ -35,25 +29,24 @@
       }
     },
     "lint": {
-      "executor": "@nrwl/linter:eslint",
-      "configurations": {
-        "ci": {
-          "quiet": true,
-          "cacheLocation": ".cache/eslint"
-        }
-      },
       "options": {
         "eslintConfig": "packages/@o3r/apis-manager/.eslintrc.js",
         "lintFilePatterns": [
-          "packages/@o3r/apis-manager/src/**/*.ts"
+          "packages/@o3r/apis-manager/src/**/*.ts",
+          "packages/@o3r/apis-manager/package.json"
         ]
       }
     },
     "test": {
-      "executor": "@nrwl/jest:jest",
+      "executor": "@nx/jest:jest",
       "options": {
-        "jestConfig": "packages/@o3r/apis-manager/jest.config.js",
-        "silent": true
+        "jestConfig": "packages/@o3r/apis-manager/jest.config.js"
+      }
+    },
+    "test-int": {
+      "executor": "@nx/jest:jest",
+      "options": {
+        "jestConfig": "packages/@o3r/apis-manager/testing/jest.config.it.js"
       }
     },
     "prepare-publish": {
@@ -66,6 +59,12 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "npm publish packages/@o3r/apis-manager/dist"
+      }
+    },
+    "documentation": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "compodoc"
       }
     }
   },

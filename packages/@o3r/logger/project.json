@@ -7,10 +7,7 @@
   "targets": {
     "build": {
       "executor": "nx:noop",
-      "dependsOn": [
-        "build-builders",
-        "compile"
-      ]
+      "dependsOn": ["build-builders", "compile"]
     },
     "prepare-build-builders": {
       "executor": "nx:run-script",
@@ -24,33 +21,38 @@
         "script": "build:builders"
       }
     },
+    "prepare": {
+      "executor": "nx:run-script",
+      "outputs": ["{projectRoot}/src/package.json"],
+      "inputs": [
+        "global",
+        "{projectRoot}/package.json"
+      ],
+      "options": {
+        "script": "prepare:compile"
+      }
+    },
     "compile": {
       "executor": "@angular-devkit/build-angular:ng-packagr",
       "options": {
-        "project": "packages/@o3r/logger/ng-package.json",
+        "project": "packages/@o3r/logger/src/ng-package.json",
         "tsConfig": "packages/@o3r/logger/tsconfig.build.json"
-      }
+      },
+      "dependsOn": ["prepare", "^build"]
     },
     "lint": {
-      "executor": "@nrwl/linter:eslint",
-      "configurations": {
-        "ci": {
-          "quiet": true,
-          "cacheLocation": ".cache/eslint"
-        }
-      },
       "options": {
         "eslintConfig": "packages/@o3r/logger/.eslintrc.js",
         "lintFilePatterns": [
-          "packages/@o3r/logger/src/**/*.ts"
+          "packages/@o3r/logger/src/**/*.ts",
+          "packages/@o3r/logger/package.json"
         ]
       }
     },
     "test": {
-      "executor": "@nrwl/jest:jest",
+      "executor": "@nx/jest:jest",
       "options": {
-        "jestConfig": "packages/@o3r/logger/jest.config.js",
-        "silent": true
+        "jestConfig": "packages/@o3r/logger/jest.config.js"
       }
     },
     "prepare-publish": {
@@ -63,6 +65,12 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "npm publish packages/@o3r/logger/dist"
+      }
+    },
+    "documentation": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "compodoc"
       }
     }
   },

@@ -5,7 +5,15 @@ describe('Form helpers', () => {
 
   describe('markAllControlsDirtyAndTouched and markAllControlsPristineAndUntouched', () => {
 
-    let form: FormGroup;
+    let form: FormGroup<{
+      first: FormControl<any>;
+      last: FormControl<any>;
+      subGroup: FormGroup<{
+        day: FormControl<any>;
+        month: FormControl<any>;
+        year: FormControl<any>;
+      }>;
+    }>;
 
     beforeEach(() => {
       form = new FormGroup({
@@ -20,8 +28,7 @@ describe('Form helpers', () => {
     });
 
     it('should have a pristine initial state', () => {
-      const controlsKey = 'controls';
-      const deepChild = form.controls.subGroup[controlsKey].day;
+      const deepChild = form.controls.subGroup.controls.day;
 
       expect(form.controls.first.pristine).toBe(true);
       expect(deepChild.dirty).toBe(false);
@@ -37,8 +44,7 @@ describe('Form helpers', () => {
 
     it('should mark a deep child as dirty/touched', () => {
       markAllControlsDirtyAndTouched(form);
-      const controlsKey = 'controls';
-      const deepChild = form.controls.subGroup[controlsKey].month;
+      const deepChild = form.controls.subGroup.controls.month;
 
       expect(deepChild.dirty).toBe(true);
     });
@@ -151,7 +157,7 @@ describe('Form helpers', () => {
       form = new FormGroup({
         firstName: new FormControl()
       });
-      form.get('firstName')!.setErrors({singleError: {expected: true, actual: false}});
+      form.get('firstName').setErrors({singleError: {expected: true, actual: false}});
 
       expect(getFlatControlErrors(form)).toEqual([
         {
@@ -171,7 +177,7 @@ describe('Form helpers', () => {
         firstName: new FormControl()
       });
       form.setErrors({randomGlobalError: true});
-      form.get('firstName')!.setErrors({singleError: {expected: true, actual: false}});
+      form.get('firstName').setErrors({singleError: {expected: true, actual: false}});
 
       const errors = getFlatControlErrors(form);
 
@@ -200,7 +206,7 @@ describe('Form helpers', () => {
       form = new FormGroup({
         firstName: new FormControl()
       });
-      form.get('firstName')!.setErrors({
+      form.get('firstName').setErrors({
         singleError: {expected: true, actual: false},
         anotherError: 'SYSTEM_ERROR'
       });
@@ -232,9 +238,9 @@ describe('Form helpers', () => {
       });
 
       form.setErrors({error1: 10});
-      form.get('cardNumber')!.setErrors({error2: 20});
-      form.get('expiryDate')!.setErrors({error3: 30});
-      form.get('expiryDate')!.get('month')!.setErrors({error4: 40});
+      form.get('cardNumber').setErrors({error2: 20});
+      form.get('expiryDate').setErrors({error3: 30});
+      form.get('expiryDate').get('month').setErrors({error4: 40});
 
       expect(getFlatControlErrors(form)).toEqual([
         { // Global form

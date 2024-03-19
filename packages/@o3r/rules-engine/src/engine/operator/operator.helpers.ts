@@ -1,28 +1,39 @@
 import {DateInput, Operator, SupportedSimpleTypes} from './operator.interface';
+import type {Facts} from '../fact';
 
 /**
  * Execute Operator
- *
  * @param lhs Left hand side
  * @param rhs Right hand side
  * @param operator Operator to compare values
+ * @param operatorFacts Facts that operator can depend on
  */
-export function executeOperator<L = unknown, R = unknown>(lhs: L, rhs: R, operator: Operator<L, R>) {
+export function executeOperator<L = unknown, R = unknown>(lhs: L, rhs: R, operator: Operator<L, R>, operatorFacts?: Record<string, Facts | undefined>) {
   const validLhs = (!operator.validateLhs || operator.validateLhs(lhs));
   const validRhs = (!operator.validateRhs || operator.validateRhs(rhs));
+  let operatorFactValues: Record<string, Facts> | undefined;
+  if (operatorFacts && operator.factImplicitDependencies) {
+    operatorFactValues = operator.factImplicitDependencies.reduce((acc, dep) => {
+      if (operatorFacts[dep]) {
+        acc[dep] = operatorFacts[dep]!;
+      } else {
+        throw new Error(`The fact "${dep}" requested by ${operator.name} cannot be found.`);
+      }
+      return acc;
+    }, {} as Record<string, Facts>);
+  }
   if (!validLhs) {
-    throw new Error(`Invalid left operand : ${JSON.stringify(lhs)}`);
+    throw new Error(`Invalid left operand: ${JSON.stringify(lhs)}`);
   }
   if (!validRhs) {
-    throw new Error(`Invalid right operand : ${JSON.stringify(rhs)}`);
+    throw new Error(`Invalid right operand: ${JSON.stringify(rhs)}`);
   }
-  const obs = operator.evaluator(lhs, rhs);
+  const obs = operator.evaluator(lhs, rhs, operatorFactValues);
   return obs;
 }
 
 /**
  * Validate a number operand
- *
  * @param operand value of one of the operands
  */
 export function numberValidator(operand: unknown): operand is number | string {
@@ -32,7 +43,6 @@ export function numberValidator(operand: unknown): operand is number | string {
 
 /**
  * Validate an operand is a range of numbers
- *
  * @param operatorInput value of one of the operands
  */
 export function isRangeNumber(operatorInput: unknown): operatorInput is [number | string, number | string] {
@@ -45,7 +55,6 @@ export function isRangeNumber(operatorInput: unknown): operatorInput is [number 
 
 /**
  * Verifies if the parameter is a valid date for the operator (getTime function available returning a number)
- *
  * @param operatorInput
  */
 export const isValidDate = (operatorInput: any): operatorInput is Date => {
@@ -58,7 +67,6 @@ export const isValidDate = (operatorInput: any): operatorInput is Date => {
 
 /**
  * Verifies if the parameter is a valid input for Date constructor (new Date returns a valid date)
- *
  * @param operatorInput
  */
 export const isValidDateInput = (operatorInput: any): operatorInput is DateInput => {
@@ -67,7 +75,6 @@ export const isValidDateInput = (operatorInput: any): operatorInput is DateInput
 
 /**
  * Verifies if the parameter is a valid date range
- *
  * @param operatorInput
  */
 export const isValidDateRange = (operatorInput: any): operatorInput is [DateInput, DateInput] => {
@@ -80,7 +87,6 @@ export const isValidDateRange = (operatorInput: any): operatorInput is [DateInpu
 
 /**
  * Validate that a value is a supported simple type
- *
  * @param value value to validate
  */
 export function isSupportedSimpleTypes(value: unknown): value is SupportedSimpleTypes {
@@ -89,9 +95,24 @@ export function isSupportedSimpleTypes(value: unknown): value is SupportedSimple
 
 /**
  * Validate that a value is a string
- *
  * @param value
  */
 export function isString(value: unknown): value is string {
   return typeof value === 'string';
+}
+
+/**
+ * Parse input to return RegExp
+ * @param value value to test whether pattern exists (can be string or array of strings)
+ * @param inputString regexp pattern
+ * @param inputRegExp
+ */
+export function parseRegExp(inputRegExp: string) {
+  if (inputRegExp.startsWith('/')) {
+    const finalSlash = inputRegExp.lastIndexOf('/');
+    const regexpPattern = inputRegExp.slice(1, finalSlash);
+    const regexpFlags = inputRegExp.slice(finalSlash + 1);
+    return new RegExp(regexpPattern, regexpFlags);
+  }
+  return new RegExp(inputRegExp);
 }

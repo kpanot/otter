@@ -1,103 +1,38 @@
 {
-  "$schema": "http://json-schema.org/schema",
+  "$schema": "http://json-schema.org/draft-07/schema",
   "$id": "ngAddSchematicsSchema",
-  "title": "Add Otter library",
-  "description": "ngAdd Otter library",
+  "title": "Add Otter Framework to an Angular project",
+  "description": "ngAdd Otter Framework to the Angular project",
   "properties": {
+    "preset": {
+      "description": "Preset of module list to automatically install",
+      "type": "string",
+      "default": "basic",
+      "enum": [
+        "basic",
+        "cms",
+        "all"
+      ],
+      "x-prompt": {
+        "message": "Which preset to use to start your application?",
+        "type": "list",
+        "items": [
+          { "value": "basic", "label": "BASIC - Minimum plugin list to install for a basic Otter application. (details on https://www.npmjs.com/package/@o3r/core#preset-basic)" },
+          { "value": "cms", "label": "CMS - Add the Otter modules allowing the full administration of the application via the CMS. (details on https://www.npmjs.com/package/@o3r/core#preset-cms)" },
+          { "value": "all", "label": "ALL - Add all the available Otter modules. (details on https://www.npmjs.com/package/@o3r/core#preset-all)" }
+        ]
+      }
+    },
+    "externalPresets": {
+      "description": "Preset of non-official module list to automatically install",
+      "type": "string"
+    },
     "projectName": {
       "type": "string",
       "description": "Project name",
       "$default": {
         "$source": "projectName"
       }
-    },
-    "enablePrefetchBuilder": {
-      "type": "boolean",
-      "default": true,
-      "description": "Install prefetch builder",
-      "x-prompt": "Activate prefetch builder to generate prefetcher JavaScript file ?"
-    },
-    "enablePlaywright": {
-      "type": "boolean",
-      "default": true,
-      "description": "Install playwright",
-      "x-prompt": "Activate playwright as E2E test system ?"
-    },
-    "enableCustomization": {
-      "type": "boolean",
-      "default": true,
-      "description": "Install Otter customization",
-      "x-prompt": "Add Otter customization mechanism to override presenter and injectable for external application"
-    },
-    "enableAnalytics": {
-      "type": "boolean",
-      "default": true,
-      "description": "Install Otter analytics",
-      "x-prompt": "Activate Otter analytics ?"
-    },
-    "enableCms": {
-      "type": "boolean",
-      "default": true,
-      "description": "Activate full CMS compatibility",
-      "x-prompt": "Add otter packages ('@o3r/{localization,styling,components,configuration}') to make the aplication CMS compatible ?"
-    },
-    "enableStyling": {
-      "type": "boolean",
-      "default": true,
-      "description": "Install Otter theming and styling extractor",
-      "x-prompt": "Add Otter styling setup?"
-    },
-    "enableConfiguration": {
-      "type": "boolean",
-      "default": true,
-      "description": "Install otter configuration package and config extractor setup",
-      "x-prompt": "Add Otter configuration setup ?"
-    },
-    "enableRulesEngine": {
-      "type": "boolean",
-      "default": false,
-      "description": "Install otter rules-engine package",
-      "x-prompt": "Add Otter rules-engine setup ?"
-    },
-    "enableLocalization": {
-      "type": "boolean",
-      "default": true,
-      "description": "Localization generation setup and localization extractor",
-      "x-prompt": "Add Otter localization setup ?"
-    },
-    "enableStorybook": {
-      "type": "boolean",
-      "default": true,
-      "description": "Install Storybook configurations",
-      "x-prompt": "Add storybook setup ?"
-    },
-    "enableApisManager": {
-      "type": "boolean",
-      "default": true,
-      "description": "Install otter apis manager",
-      "x-prompt": "Add APIs manager setup providing the SDK via injectable ?"
-    },
-    "isDefaultGenerator": {
-      "type": "boolean",
-      "description": "Set the Otter Generator as default ngCLI generator",
-      "default": true,
-      "x-prompt": "Set Otter as default ngCLI generator ?"
-    },
-    "generateAzurePipeline": {
-      "type": "boolean",
-      "description": "Generate the Azure Pipeline for the new project",
-      "default": false,
-      "x-prompt": "Generate the Azure Pipeline for the new project?"
-    },
-    "testingFramework": {
-      "type": "string",
-      "description": "The testing framework to use",
-      "default": "jest",
-      "enum": [
-        "jest",
-        "jasmine"
-      ],
-      "x-prompt": "Which testing framework would you like to use?"
     },
     "skipLinter": {
       "type": "boolean",
@@ -108,8 +43,24 @@
       "type": "boolean",
       "description": "Skip the install process",
       "default": true
+    },
+    "withDevtool": {
+      "description": "Add option to automatically register the devtool module",
+      "type": "boolean",
+      "default": true
+    },
+    "forceInstall": {
+      "description": "Force package installation (in case of unmet peer dependencies)",
+      "type": "boolean",
+      "default": true
+    },
+    "exactO3rVersion": {
+      "type": "boolean",
+      "description": "Use a pinned version for otter packages",
+      "default": false
     }
   },
+  "additionalProperties": true,
   "required": [
   ]
 }

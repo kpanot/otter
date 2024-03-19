@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema",
+  "$id": "NgGenerateTypescriptSDKSchematicsSchema",
+  "title": "Generate Typescript SDK",
+  "description": "ng generate typescript-shell",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Project name (NPM package scope, package.json name will be @{projectName}/{packageName})",
+      "x-prompt": "Project name (NPM package scope, package.json name will be @{projectName}/{packageName})?"
+    },
+    "package": {
+      "type": "string",
+      "description": "Package name (package.json name will be @{projectName}/{packageName})",
+      "x-prompt": "Package name (package.json name will be @{projectName}/{packageName})?",
+      "default": "sdk"
+    },
+    "description": {
+      "type": "string",
+      "description": "Project description"
+    },
+    "directory": {
+      "type": "string",
+      "description": "Directory where to generate the SDK"
+    },
+    "skipInstall": {
+      "type": "boolean",
+      "description": "Skip NPM install",
+      "default": false
+    },
+    "packageManager": {
+      "type": "string",
+      "enum": [
+        "npm",
+        "yarn"
+      ],
+      "description": "Package manager to be used in the generated SDK"
+    },
+    "exactO3rVersion": {
+      "type": "boolean",
+      "description": "Use a pinned version for otter packages",
+      "default": false
+    }
+  },
+  "additionalProperties": true,
+  "required": [
+    "name",
+    "package"
+  ]
+}

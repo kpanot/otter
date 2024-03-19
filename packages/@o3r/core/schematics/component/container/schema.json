@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/schema",
+  "$schema": "http://json-schema.org/draft-07/schema",
   "$id": "NgGenerateComponentContainerSchematicsSchema",
   "title": "Generate Otter Container Component",
   "description": "ng generate Otter Container Component",
@@ -40,19 +40,19 @@
     },
     "useComponentFixtures": {
       "type": "boolean",
-      "description": "Generate component fixtures for tests",
-      "default": true,
-      "x-prompt": "Generate component fixtures for tests?"
+      "description": "Generate component fixtures for tests"
     },
     "useOtterConfig": {
       "type": "boolean",
-      "description": "Generate component with Otter configuration",
-      "default": true
+      "description": "Generate component with Otter configuration"
     },
     "useContext": {
       "type": "boolean",
-      "description": "Generate component context",
-      "default": true
+      "description": "Generate component context"
+    },
+    "useRulesEngine": {
+      "type": "boolean",
+      "description": "Generate component with rules-engine"
     },
     "description": {
       "type": "string",
@@ -62,6 +62,11 @@
     "skipLinter": {
       "type": "boolean",
       "description": "Skip the linter process",
+      "default": false
+    },
+    "standalone": {
+      "type": "boolean",
+      "description": "Whether the generated component is standalone.",
       "default": false
     }
   },

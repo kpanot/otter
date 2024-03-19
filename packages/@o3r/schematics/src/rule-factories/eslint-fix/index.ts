@@ -1,55 +1,42 @@
-import { DirEntry, Rule, SchematicContext, SchematicsException, Tree } from '@angular-devkit/schematics';
-import { exec } from 'node:child_process';
-import { dirname, join, resolve } from 'node:path';
-
-/**
- * Linter options
- */
-export interface LinterOptions {
-  /**
-   * Indicates if the linter process should succeed even if there are lint errors remaining
-   *
-   * @default true
-   */
-
-  force?: boolean;
-  /**
-   * If enabled, only errors are reported (--quiet option of ESLint CLI)
-   *
-   * @default true
-   */
-  hideWarnings?: boolean;
-}
+import { DirEntry, noop, Rule, SchematicContext, Tree } from '@angular-devkit/schematics';
+import { dirname, join } from 'node:path';
+import { EslintFixTask, LinterOptions } from '../../tasks/index';
 
 /**
  * Apply EsLint fix
- *
  * @param prootPath Root path
  * @param _prootPath
  * @param extension List of file extensions to lint
  * @param options Linter options
  */
 export function applyEsLintFix(_prootPath = '/', extension: string[] = ['ts'], options?: LinterOptions): Rule {
-  const linterOptions = {
-    force: true,
+  try {
+    require.resolve('eslint/package.json');
+  } catch {
+    return noop();
+  }
+
+  const linterOptions: LinterOptions = {
+    continueOnError: true,
     hideWarnings: true,
     ...options
   };
 
   return (tree: Tree, context: SchematicContext) => {
+    const filesToBeLint = tree.actions
+      .filter((a) => a.kind !== 'd')
+      .map((action) => action.path.substring(1));
 
     // directory of the deepest file
     let dir: DirEntry | null = tree.getDir(
       dirname(
-        tree.actions
-          .map((action) => action.path.substr(1))
-          .reduce((acc, path) => {
-            const level = path.split('/').length;
-            if (acc.level < level) {
-              return { level, path };
-            }
-            return acc;
-          }, {level: 0, path: ''}).path
+        filesToBeLint.reduce((acc, path) => {
+          const level = path.split('/').length;
+          if (acc.level < level) {
+            return {level, path};
+          }
+          return acc;
+        }, {level: 0, path: ''}).path
       )
     );
 
@@ -57,7 +44,7 @@ export function applyEsLintFix(_prootPath = '/', extension: string[] = ['ts'], o
     do {
       eslintFile = dir.subfiles.find((f) => f.startsWith('.eslintrc'));
       if (eslintFile) {
-        eslintFile = join(dir.path.substr(1), eslintFile);
+        eslintFile = join(dir.path.substring(1), eslintFile);
         break;
       }
 
@@ -65,30 +52,29 @@ export function applyEsLintFix(_prootPath = '/', extension: string[] = ['ts'], o
     } while (dir !== null);
 
     if (dir === null || !eslintFile) {
-      throw new SchematicsException('Asked to run lint fixes, but could not find a eslintrc config file.');
+      context.logger.warn(`Asked to run lint fixes, but could not find a eslintrc config file.
+You can consider to run later the following command to add otter linter rules: ng add @o3r/eslint-config-otter`);
     }
 
-    const files = tree.actions.reduce((acc: Set<string>, action) => {
-      const filePath = action.path.substr(1);
-      if (extension.some((ext) => filePath.endsWith(`.${ext}`)) && dir && action.path.startsWith(dir.path)) {
+    const files = filesToBeLint.reduce((acc: Set<string>, filePath) => {
+      if (extension.some((ext) => filePath.endsWith(`.${ext}`)) && dir && filePath.startsWith(dir.path.substring(1))) {
         acc.add(filePath);
       }
 
       return acc;
     }, new Set<string>());
 
-    exec(
-      'yarn eslint ' +
-        Array.from(files).map((file) => `"${file}"`).join(' ') +
-        ' --fix --color' +
-        (linterOptions.hideWarnings ? ' --quiet' : '') +
-        (eslintFile ? ` --config ${eslintFile} --parser-options=tsconfigRootDir:${resolve(process.cwd(), dirname(eslintFile))}` : ''),
-      (_error, stdout, stderr) => {
-        context.logger.info(stdout);
-        if (!linterOptions.force) {
-          context.logger.error(stderr);
-        }
-      }
-    );
+    if (files.size) {
+      context.addTask(
+        new EslintFixTask(
+          Array.from(files),
+          undefined,
+          eslintFile,
+          linterOptions
+        )
+      );
+    }
+
+    return tree;
   };
 }

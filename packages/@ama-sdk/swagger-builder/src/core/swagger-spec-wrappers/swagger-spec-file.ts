@@ -30,7 +30,6 @@ export abstract class SwaggerSpecFile implements SwaggerSpec {
 
   /**
    * Convert the reference relative paths to absolute paths
-   *
    * @param currentNode Node to inspect in the Swagger spec object
    * @param field Field of the node
    */
@@ -73,7 +72,7 @@ export abstract class SwaggerSpecFile implements SwaggerSpec {
     return Object.keys(this.spec!)
       .filter((k) => ['tags', 'parameters', 'paths', 'definitions'].indexOf(k.toLowerCase()) < 0)
       .reduce<{ [k: string]: any }>((acc, k) => {
-        acc[k] = this.spec![k];
+        acc[k] = this.spec![k as keyof Spec];
         return acc;
       }, {});
   }

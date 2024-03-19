@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import yaml from 'js-yaml';
-import mkdirp from 'mkdirp';
 import path from 'node:path';
 import { Formatter } from './formatter.interface';
 import { generatePackageJson } from './utils';
@@ -19,34 +18,32 @@ export class SplitYamlFormatter implements Formatter {
   /** Parameters file */
   public readonly PARAMETERS_FILE = 'parameters';
 
-  private filePath: string;
-  private cwd: string;
+  private readonly filePath: string;
+  private readonly cwd: string;
 
-  constructor(private basePath: string) {
+  constructor(private readonly basePath: string) {
     this.filePath = /\.json$/i.test(this.basePath) ? this.basePath : this.basePath + '.json';
     this.cwd = path.dirname(this.filePath);
   }
 
   /**
    * Write a YAML file
-   *
    * @param filePath Path to the file to write
    * @param content Content of the file to write
    */
   private async writeFileYaml(filePath: string, content: any) {
-    await mkdirp(path.dirname(filePath));
-    return new Promise<void>((resolve, reject) => fs.writeFile(filePath, yaml.dump(content, { indent: 2 }), (err) => err ? reject(err) : resolve()));
+    await fs.promises.mkdir(path.dirname(filePath), {recursive: true});
+    await fs.promises.writeFile(filePath, yaml.dump(content, { indent: 2 }));
   }
 
   /**
    * Write a JSON file
-   *
    * @param filePath Path to the file to write
    * @param content Content of the file to write
    */
   private async writeFileJson(filePath: string, content: any) {
-    await mkdirp(path.dirname(filePath));
-    return new Promise<void>((resolve, reject) => fs.writeFile(filePath, JSON.stringify(content, null, 2), (err) => err ? reject(err) : resolve()));
+    await fs.promises.mkdir(path.dirname(filePath), {recursive: true});
+    await fs.promises.writeFile(filePath, JSON.stringify(content, null, 2));
   }
 
   private async rewriterReferences(currentNode: any, field?: string): Promise<any> {
@@ -64,7 +61,7 @@ export class SplitYamlFormatter implements Formatter {
         currentNode.map((n) => this.rewriterReferences(n))
       );
     } else if (typeof currentNode === 'object') {
-      const ret = {};
+      const ret: Record<string, any> = {};
       for (const k of Object.keys(currentNode)) {
         ret[k] = await this.rewriterReferences(currentNode[k], k);
       }
@@ -75,7 +72,6 @@ export class SplitYamlFormatter implements Formatter {
 
   /**
    * Generate the definition files based on the given Swagger spec
-   *
    * @param spec Swagger specification
    */
   private async generateDefinitionFiles(spec: any) {
@@ -97,7 +93,6 @@ export class SplitYamlFormatter implements Formatter {
 
   /**
    * Generate the definition files based on the given Swagger specification
-   *
    * @param spec Swagger specification
    */
   private generateParameterFile(spec: any) {
@@ -114,7 +109,6 @@ export class SplitYamlFormatter implements Formatter {
 
   /**
    * Generate the product files based on the given Swagger specification
-   *
    * @param spec Swagger specification
    */
   private async generateProductFiles(spec: any): Promise<string[]> {
@@ -159,7 +153,6 @@ export class SplitYamlFormatter implements Formatter {
 
   /**
    * Generate the template file based on the given Swagger specification
-   *
    * @param spec Swagger specification
    */
   private generateEnvelop(spec: any) {
@@ -175,7 +168,6 @@ export class SplitYamlFormatter implements Formatter {
 
   /**
    * Generate the API description JSON file based on the list of products of the Swagger specification
-   *
    * @param products List of product of the Swagger spec
    */
   private generateJsonFile(products: string[]) {
@@ -200,14 +192,14 @@ export class SplitYamlFormatter implements Formatter {
 
   /** @inheritdoc */
   public async generateArtifact(artifactName: string, spec: any): Promise<void> {
-    await mkdirp(this.cwd);
+    await fs.promises.mkdir(this.cwd, {recursive: true});
 
     const content = JSON.stringify({
       ...generatePackageJson(artifactName, spec),
       main: path.relative(this.cwd, this.filePath)
     }, null, 2);
 
-    await new Promise<void>((resolve, reject) => fs.writeFile(path.resolve(this.cwd, 'package.json'), content, (err) => err ? reject(err) : resolve()));
+    await fs.promises.writeFile(path.resolve(this.cwd, 'package.json'), content);
     // eslint-disable-next-line no-console, no-restricted-syntax
     console.info(`Artifact generated for ${this.filePath}`);
   }

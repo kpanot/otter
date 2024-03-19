@@ -1,4 +1,5 @@
 import type { JsonObject } from '@angular-devkit/core';
+import type { CategoryDescription } from '@o3r/core';
 
 export interface ComponentExtractorBuilderSchema extends JsonObject {
 
@@ -15,7 +16,7 @@ export interface ComponentExtractorBuilderSchema extends JsonObject {
   configOutputFile: string;
 
   /** Library/Application name to be assigned into metadata */
-  name: string;
+  name: string | null;
 
   /** Enable watch mode */
   watch: boolean;
@@ -34,4 +35,10 @@ export interface ComponentExtractorBuilderSchema extends JsonObject {
 
   /** Include placeholder metadata file */
   placeholdersMetadataFilePath: string | null;
+
+  /**
+   * List of global categories with description
+   */
+  /* Adding `& JsonObject` as workaround */
+  globalConfigCategories: (CategoryDescription & JsonObject)[];
 }

@@ -7,9 +7,7 @@
   "targets": {
     "build": {
       "executor": "nx:run-script",
-      "outputs": [
-        "{projectRoot}/dist/package.json"
-      ],
+      "outputs": ["{projectRoot}/dist/package.json"],
       "options": {
         "script": "postbuild"
       },
@@ -23,28 +21,38 @@
     },
     "compile": {
       "executor": "@angular-devkit/build-angular:ng-packagr",
+      "dependsOn": ["^build", "prepare"],
       "options": {
-        "project": "packages/@o3r/rules-engine/ng-package.json",
+        "project": "packages/@o3r/rules-engine/src/ng-package.json",
         "tsConfig": "packages/@o3r/rules-engine/tsconfig.build.json"
       }
     },
-    "extract-rules-engine": {
-      "executor": "./packages/@o3r/rules-engine/dist:extractor",
-      "outputs": [
-        "{options.outputFactsDirectory}/rules.facts.metadata.json",
-        "{options.outputOperatorsDirectory}/rules.operators.metadata.json"
+    "prepare": {
+      "executor": "nx:run-script",
+      "inputs": [
+        "global",
+        "{projectRoot}/package.json"
       ],
+      "outputs": ["{projectRoot}/src/package.json"],
+      "dependsOn": ["^build"],
+      "options": {
+        "script": "prepare:compile"
+      }
+    },
+    "extract-rules-engine": {
+      "executor": "@o3r/rules-engine:extractor",
       "options": {
         "tsConfig": "./packages/@o3r/rules-engine/tsconfig.build.json",
         "outputFactsDirectory": "./packages/@o3r/rules-engine/dist",
         "outputOperatorsDirectory": "./packages/@o3r/rules-engine/dist",
         "operatorFilePatterns": [
           "./packages/@o3r/rules-engine/src/engine/operator/operators/**/*.operators.ts"
+        ],
+        "factFilePatterns": [
+          "./packages/@o3r/rules-engine/src/facts/**/*.facts.ts"
         ]
       },
-      "dependsOn": [
-        "build-builders"
-      ]
+      "dependsOn": ["build-builders"]
     },
     "build-fixtures": {
       "executor": "nx:noop"
@@ -74,25 +82,24 @@
       }
     },
     "lint": {
-      "executor": "@nrwl/linter:eslint",
-      "configurations": {
-        "ci": {
-          "quiet": true,
-          "cacheLocation": ".cache/eslint"
-        }
-      },
       "options": {
         "eslintConfig": "packages/@o3r/rules-engine/.eslintrc.js",
         "lintFilePatterns": [
-          "packages/@o3r/rules-engine/src/**/*.ts"
+          "packages/@o3r/rules-engine/src/**/*.ts",
+          "packages/@o3r/rules-engine/package.json"
         ]
       }
     },
     "test": {
-      "executor": "@nrwl/jest:jest",
+      "executor": "@nx/jest:jest",
       "options": {
-        "jestConfig": "packages/@o3r/rules-engine/jest.config.js",
-        "silent": true
+        "jestConfig": "packages/@o3r/rules-engine/jest.config.js"
+      }
+    },
+    "test-int": {
+      "executor": "@nx/jest:jest",
+      "options": {
+        "jestConfig": "packages/@o3r/rules-engine/testing/jest.config.it.js"
       }
     },
     "prepare-publish": {
@@ -105,6 +112,12 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "npm publish packages/@o3r/rules-engine/dist"
+      }
+    },
+    "documentation": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "compodoc"
       }
     }
   },

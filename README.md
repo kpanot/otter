@@ -1,17 +1,20 @@
 <h1 align="center">Otter Framework</h1>
 <p align="center">
-  <img src="./.attachments/logo.png" alt="Super cute Otter!"/>
+  <img src="./assets/logo/otter.png" alt="Super cute Otter!" width="40%"/>
 </p>
 
-<br />
-<br />
-
 ## Description
+
+[![Stable Version](https://img.shields.io/npm/v/@o3r/core)](https://www.npmjs.com/package/@o3r/core)
+
 The **Otter** project is a highly modular framework whose goal is to provide a common platform to accelerate and facilitate the development on Angular web applications.
 It is split into several units to cover different aspects of these applications (localization, testing, customization, etc.).
 Also, to customize an application, metadata can be extracted from the application source code and injected into a CMS to manage dynamic configuration.
 
-> **Note**:  The full documentation is available [here](./docs/README.md).
+> [!TIP]
+> The full documentation is available [here](./docs/README.md) and the Architecture overview schema is available [here](./docs/core/ARCHITECTURE.md).
+>
+> A showcase to help you integrate some simple use cases is available [here](https://amadeusitgroup.github.io/otter/#/home).
 
 ## Built With
 
@@ -24,18 +27,15 @@ Also, to customize an application, metadata can be extracted from the applicatio
 
 ## Get Started
 
-A new application can be set up with these simple commands:
+A new application can be set up with this simple command:
 
 ```shell
-# Starting a new angular application
-npm install -g @angular/cli
-ng new my-app
-
-# Add Otter framework
-ng add @o3r/core
+# Starting a new Otter application
+npm create @o3r my-app
 ```
 
-> **Note**: Please refer to [Otter Get Started](./docs/core/START_NEW_APPLICATION.md) and [Angular Get Started](https://angular.io/guide/setup-local#install-the-angular-cli) for complete documentation.
+> [!TIP]
+> Please refer to [Otter Get Started](./docs/core/START_NEW_APPLICATION.md) and [Angular Get Started](https://angular.io/guide/setup-local#install-the-angular-cli) for complete documentation.
 
 ## Contributing
 
@@ -61,23 +61,23 @@ Any bug of feature request can be addressed via [issue](https://github.com/Amade
 These documents describe how to set up your development environment to build and test the framework.
 It also explains the basic mechanics of using `git`, `node`, and `npm`.
 
-- [Description](#description)
-- [Built With](#built-with)
-- [Get Started](#get-started)
-- [Contributing](#contributing)
-- [Versioning](#versioning)
-- [License](#license)
-- [Acknowledgments](#acknowledgments)
-- [Developer](#developer)
-  - [Building and Testing library](#building-and-testing-library)
-    - [Prerequisite Software](#prerequisite-software)
-    - [Getting the Sources](#getting-the-sources)
-    - [Installing NPM Modules](#installing-npm-modules)
-    - [Build command](#build-command)
-    - [Running tests locally](#running-tests-locally)
-    - [Manage task cache](#manage-task-cache)
-    - [Debugging with Visual Studio Code](#debugging-with-visual-studio-code)
-    - [Link local packages](#link-local-packages)
+* [Description](#description)
+* [Built With](#built-with)
+* [Get Started](#get-started)
+* [Contributing](#contributing)
+* [Versioning](#versioning)
+* [License](#license)
+* [Acknowledgments](#acknowledgments)
+* [Developer](#developer)
+  * [Building and Testing library](#building-and-testing-library)
+    * [Prerequisite Software](#prerequisite-software)
+    * [Getting the sources](#getting-the-sources)
+    * [Installing NPM modules](#installing-npm-modules)
+    * [Build command](#build-command)
+    * [Running tests locally](#running-tests-locally)
+    * [Manage task cache](#manage-task-cache)
+    * [Debugging with Visual Studio Code](#debugging-with-visual-studio-code)
+    * [Link local packages](#link-local-packages)
 
 Refer to the [contribution guidelines](./CONTRIBUTING.md)
 if you'd like to contribute to the framework.
@@ -92,14 +92,14 @@ following products on your development machine:
   * [GitHub's Guide to Installing
     Git](https://help.github.com/articles/set-up-git) is a good source of information.
 
-* [Node.js](http://nodejs.org), (version `>=10.0.0`)
-  * This is used to run tests and generate distributable files. We also use Node's Package Manager, `npm`
-    (version `>3.8.x`), which comes with Node. Depending on your system, you can install Node either from
-    source or as a pre-packaged bundle.
-  
+* [Node.js](http://nodejs.org), (version `>=18.0.0`)
+  * This is used to run tests and generate distributable files. We strongly encourage to use an up-to-date LTS version of Node.js to ensure the support of all the Otter packages.
+    Each package comes with a minimum Node.js version range defined in the `engine` property of its package.json file.
+
 * [Yarn](https://yarnpkg.com/lang/en/docs/install/), a Node's Package Manager
   * You can install yarn using NPM manager (coming with Node.js).
-    The version of Yarn currently used is embedded in the repository. In case you need to link this library with your project, you can check the section "Link local packages".
+    The version of Yarn currently used is embedded in the repository and it can be installed using the provided Node.js [corepack](https://yarnpkg.com/getting-started/install).
+    In case you need to link this library with your project, you can check the section "Link local packages".
 
 * [Chrome](https://www.google.com/chrome/browser/desktop/index.html)
   * We use Chrome to run our tests.
@@ -136,7 +136,8 @@ Each module can be built independently thanks to [Nx](https://nx.dev/packages/nx
 yarn nx build core
 ```
 
-> **Note**: Results are put in the `dist` of each module (`packages/@<scope>/<module>/dist`).
+> [!NOTE]
+> Results are put in the `dist` of each module (`packages/@<scope>/<module>/dist`).
 
 #### Running tests locally
 
@@ -152,7 +153,15 @@ Check Unit Tests:
 yarn run test
 ```
 
-Each module can be test independently thanks to [Nx](https://nx.dev/packages/nx/documents/run) commands:
+Check Integration Tests:
+
+```shell
+yarn run test-int
+```
+
+[Verdaccio](./.verdaccio/README.md) is used to run the integration tests as close as possible to a real npm publication.
+
+Each module can be tested independently thanks to [Nx](https://nx.dev/packages/nx/documents/run) commands:
 
 ```shell
 # ex: Test Core package only

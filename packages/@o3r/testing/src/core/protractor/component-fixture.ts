@@ -2,12 +2,13 @@
 import { browser, By, element, ElementFinder } from 'protractor';
 import { FixtureUsageError } from '../../errors/index';
 
-import { ComponentFixtureProfile } from '../component-fixture';
+import type { ComponentFixtureProfile } from '../component-fixture';
+import { withTimeout } from '../helpers';
 import { O3rElement, O3rElementConstructor } from './element';
 import { O3rGroup, O3rGroupConstructor } from './group';
 import { convertPromise } from './utils';
 
-export { ComponentFixtureProfile, Constructable, FixtureWithCustom } from '../component-fixture';
+export type { ComponentFixtureProfile, Constructable, FixtureWithCustom } from '../component-fixture';
 
 /**
  * Implementation of the fixture dedicated to protractor, hence using the webdriver to interact with the dom.
@@ -21,18 +22,132 @@ export class O3rComponentFixture<V extends O3rElement = O3rElement> implements C
   /**
    * Root element of this fixture. Optional in a Protractor.
    * All further queries will be applied to the element tree if any, otherwise they will be applied to the whole DOM.
-   *
    * @param rootElement
    */
   constructor(rootElement?: V) {
     this.rootElement = rootElement;
   }
 
-  protected throwOnUndefined<T extends O3rElement>(elemnt?: T) {
+  /**
+   * Throws an exception if the element is undefined.
+   * Otherwise returns the element.
+   * @param elemnt ElementProfile to test
+   * @param _timeout specific timeout that will throw when reach
+   */
+  protected throwOnUndefinedElement<T extends O3rElement>(elemnt?: T, _timeout?: number): Promise<T> {
     if (!elemnt) {
       throw new Error('Element not found in ' + this.constructor.name);
     }
-    return elemnt;
+    return Promise.resolve(elemnt);
+  }
+
+  /**
+   * Throws an exception if the element is undefined.
+   * Otherwise returns the element.
+   * @param elemnt ElementProfile to test
+   * @param timeout specific timeout that will throw when reach
+   */
+  protected async throwOnUndefined<T extends O3rElement>(elemnt: Promise<T | undefined>, timeout?: number): Promise<T> {
+    return withTimeout(elemnt, timeout)
+      .then((el) => {
+        if (!el) {
+          throw new Error('Element not found in ' + this.constructor.name);
+        }
+        return el;
+      });
+  }
+
+
+  /**
+   * Get the element associated to the selector if present
+   * @param selector Selector to access the element
+   * @param elementConstructor Constructor that will be used to create the Element, defaults to O3rElement
+   * @param options Options supported
+   * @param options.index index Select the element associated to the index
+   * @param options.shouldThrowIfNotPresent If set to true the function will throw if the element is not present
+   * @param options.timeout Duration to wait for the element to be present before it throws
+   */
+  protected async queryWithOptions(
+    selector: string,
+    elementConstructor?: O3rElementConstructor<O3rElement>,
+    options: {
+      index?: number;
+      shouldThrowIfNotPresent?: boolean;
+      timeout?: number;
+    } = {}
+  ): Promise<O3rElement | undefined> {
+    let queryElement: O3rElement | undefined;
+    if (options.index !== undefined) {
+      queryElement = await this.queryNth(selector, options.index, elementConstructor as any);
+    } else {
+      queryElement = await this.query(selector, elementConstructor as any);
+    }
+    if (options.shouldThrowIfNotPresent) {
+      return this.throwOnUndefinedElement<O3rElement>(queryElement, options.timeout);
+    }
+    return queryElement;
+  }
+
+  /**
+   * Get text from the element associated to the given selector, or undefined if the element is not found or not visible
+   * @param selector Selector to access the element
+   * @param options Options supported
+   * @param options.elementConstructor Constructor that will be used to create the Element, defaults to O3rElement
+   * @param options.index index Select the element associated to the index
+   * @param options.shouldThrowIfNotPresent If set to true the function will throw if the element is not present
+   * @param options.timeout Duration to wait for the element to be present before it throws
+   */
+  protected async getText<T extends O3rElement>(selector: string, options: {
+    elementConstructor?: O3rElementConstructor<T> | undefined;
+    index?: number;
+    shouldThrowIfNotPresent?: boolean;
+    timeout?: number;
+  } = {}): Promise<string | undefined> {
+    const getTextElement = await this.queryWithOptions(selector, options.elementConstructor, options);
+    if (!getTextElement || !await getTextElement.isVisible()) {
+      return;
+    }
+    return await getTextElement.getText();
+  }
+
+  /**
+   * Check if the element associated to the given selector is visible
+   * @param selector Selector to access the element
+   * @param options Options supported
+   * @param options.elementConstructor Constructor that will be used to create the Element, defaults to O3rElement
+   * @param options.index index Select the element associated to the index
+   * @param options.shouldThrowIfNotPresent If set to true the function will throw if the element is not present
+   * @param options.timeout Duration to wait for the element to be present before it throws
+   */
+  protected async isVisible<T extends O3rElement>(selector: string, options: {
+    elementConstructor?: O3rElementConstructor<T> | undefined;
+    index?: number;
+    shouldThrowIfNotPresent?: boolean;
+    timeout?: number;
+  } = {}): Promise<boolean> {
+    const isVisibleElement = await this.queryWithOptions(selector, options.elementConstructor, options);
+    return !!isVisibleElement && await isVisibleElement.isVisible();
+  }
+
+  /**
+   * Click on the element associated to the given selector if it exists and is visible
+   * @param selector Selector to access the element
+   * @param options Options supported
+   * @param options.elementConstructor Constructor that will be used to create the Element, defaults to O3rElement
+   * @param options.index index Select the element associated to the index
+   * @param options.shouldThrowIfNotPresent If set to true the function will throw if the element is not present
+   * @param options.timeout Duration to wait for the element to be present before it throws
+   */
+  protected async click<T extends O3rElement>(selector: string, options: {
+    elementConstructor?: O3rElementConstructor<T> | undefined;
+    index?: number;
+    shouldThrowIfNotPresent?: boolean;
+    timeout?: number;
+  } = {}): Promise<void> {
+    const clickElement = await this.queryWithOptions(selector, options.elementConstructor, options);
+    if (!!clickElement && await clickElement.isVisible()) {
+      await clickElement.click();
+    }
   }
 
   /** @inheritdoc */

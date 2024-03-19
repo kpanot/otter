@@ -1,8 +1,18 @@
-# Otter localization
+<h1 align="center">Otter localization</h1>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/AmadeusITGroup/otter/main/assets/logo/otter.png" alt="Super cute Otter!" width="40%"/>
+</p>
 
 This package is an [Otter Framework Module](https://github.com/AmadeusITGroup/otter/tree/main/docs/core/MODULE.md).
+<br />
+<br />
 
-This module provides a fallback language/translation support and debug tools
+## Description
+
+[![Stable Version](https://img.shields.io/npm/v/@o3r/localization)](https://www.npmjs.com/package/@o3r/localization)
+[![Bundle Size](https://img.shields.io/bundlephobia/min/@o3r/localization?color=green)](https://www.npmjs.com/package/@o3r/localization)
+
+This module provides a fallback language/translation support and debug tools.
 
 ## How to install
 
@@ -10,7 +20,8 @@ This module provides a fallback language/translation support and debug tools
 ng add @o3r/localization
 ```
 
-> **Warning**: this module requires [@o3r/core](https://www.npmjs.com/package/@o3r/core) to be installed.
+> [!WARNING]
+> This module requires [@o3r/core](https://www.npmjs.com/package/@o3r/core) to be installed.
 
 ## Features
 
@@ -22,7 +33,7 @@ ng add @o3r/localization
 
 - Fallback language. In case some resource key does not exist in language X, the loader tries to fetch translation bundle from the endpoint location in fallback language Y in the first place and ends by loading json bundles from the application (root of dist folder **/** by default) if previous steps have failed (bundles output path in dist folder is also configurable via a shell option).
 
-- Resource keys can be translated from templates (*.html) via a [pipe](https://github.com/ngx-translate/core/blob/master/projects/ngx-translate/core/src/lib/translate.pipe.ts) or [directive](https://github.com/ngx-translate/core/blob/master/projects/ngx-translate/core/src/lib/translate.directive.ts) as well as from typescript (*.ts) via a [service](https://github.com/ngx-translate/core/blob/master/projects/ngx-translate/core/src/lib/translate.service.ts).
+- Resource keys can be translated from templates (*.html) via a [pipe](https://github.com/ngx-translate/core/blob/master/packages/core/lib/translate.pipe.ts) or [directive](https://github.com/ngx-translate/core/blob/master/packages/core/lib/translate.directive.ts) as well as from typescript (*.ts) via a [service](https://github.com/ngx-translate/core/blob/master/packages/core/lib/translate.service.ts).
 
 - Support for resource keys with parameters
 
@@ -194,7 +205,7 @@ export  class SimpleHeaderPresModule {}
 
 <!-- using a pipe -->
 
-{{ "o3r-simple-header-pres.motto" | translate }} // => this will output Let's shape the future of travel
+{{ "o3r-simple-header-pres.motto" | o3rTranslate }} // => this will output Let's shape the future of travel
 <!-- using a directive -->
 
 <div [translate]="o3r-simple-header-pres.locWithArg" [translateParams]="{user: 'otter friend'}"> // => this will output Hello, otter friend!
@@ -207,7 +218,7 @@ export  class SimpleHeaderPresModule {}
 
 <!-- for resource with HTML markup use binding -->
 
-<span [innerHTML]="'someKeyWithHtml' | translate"></span>
+<span [innerHTML]="'someKeyWithHtml' | o3rTranslate"></span>
 
 ```
 
@@ -219,7 +230,7 @@ As a result "**hello bold**" will be printed inside the span element.
 
 <!-- dynamic resource -->
 
-{{ "someBagsAdded" | translate:{bags: 5} }} // => will output "You have added 5 bags"
+{{ "someBagsAdded" | o3rTranslate:{bags: 5} }} // => will output "You have added 5 bags"
 
 ```
 
@@ -364,8 +375,6 @@ constructor(private router: Router,
 
 ### How to add RTL support in my app
 
-- Note:  **TextDirectionDirective** is deprecated. Please refer to **TextDirectionService**.
-
 The **TextDirectionService** has to be injected in `app.component.ts` as follows.
 
 ```typescript
@@ -392,7 +401,7 @@ import {
   LazyMessageFormatConfig,
   LocalizationModule,
   translateLoaderProvider,
-  TranslateMessageFormatLazyCompiler 
+  TranslateMessageFormatLazyCompiler
 } from  "@o3r/localization";
 import { TranslateModule } from  "@ngx-translate/core";
 import { MESSAGE_FORMAT_CONFIG } from 'ngx-translate-messageformat-compiler';
@@ -427,13 +436,14 @@ registerLocaleData(localeAR, 'ar');
 class AppModule {}
 ```
 
-> **Info:** The token `MESSAGE_FORMAT_CONFIG` implement the `LazyMessageFormatConfig` interface from `@o3r/localization`.
+> [!TIP]
+> The token `MESSAGE_FORMAT_CONFIG` implement the `LazyMessageFormatConfig` interface from `@o3r/localization`.
 > The full documentation about MessageFormat configuration is available on <https://github.com/lephyrus/ngx-translate-messageformat-compiler>.
 
 ### How to localize plural expression
 
-For pluralizations we are using *TranslateMessageFormatCompiler*, comming from [ngx-translate-messageformat-compiler](https://www.npmjs.com/package/ngx-translate-messageformat-compiler) package, which is a compiler for *ngx-translate* that uses *messageformat.js* to compile translations using ICU syntax for handling pluralization and gender.  
-[ICU Message Format](http://userguide.icu-project.org/formatparse/messages) is a standardized syntax for dealing with the translation of user-visible strings into various languages that may have different requirements for the correct declension of words (e.g. according to number, gender, case) - or to simplify: pluralization.  
+For pluralizations we are using *TranslateMessageFormatCompiler*, comming from [ngx-translate-messageformat-compiler](https://www.npmjs.com/package/ngx-translate-messageformat-compiler) package, which is a compiler for *ngx-translate* that uses *messageformat.js* to compile translations using ICU syntax for handling pluralization and gender.
+[ICU Message Format](http://userguide.icu-project.org/formatparse/messages) is a standardized syntax for dealing with the translation of user-visible strings into various languages that may have different requirements for the correct declension of words (e.g. according to number, gender, case) - or to simplify: pluralization.
 Simple pluralization rules like *0, 1 or other* fits well for English but may not fit for many other languages (eastern Europe languages, asiatic languages) where pluralization rules are much more complex. If this does not fit your requirement we recommend to reformulate your text, so that you do not need to use pluralization. Example: instead of saying 'You have added 2 baggages' you may want to say 'Pieces of baggage: 2' which should be fine for most of languages no matter which number is considered to be plural.
 
 #### Integration with ngx-translate
@@ -474,7 +484,7 @@ import {MESSAGE_FORMAT_CONFIG} from 'ngx-translate-messageformat-compiler';
 ```typescript
 // component html template
 ...
-</span> {{translations.nbOfErrors | translate: {count: countMessages} }}
+</span> {{translations.nbOfErrors | o3rTranslate: {count: countMessages} }}
 ...
 ```
 
@@ -497,11 +507,11 @@ Sometimes you may want to display a different resource based on some property va
 ```
 
 ```typescript
-// in component html 
+// in component html
 <ul>
-  <li>{{ translations.people | translate: { gender: 'female', how: 'influential' } }}</li>
-  <li>{{ translations.people | translate: { gender: 'male', how: 'funny' } }}</li>
-  <li>{{ translations.people | translate: { how: 'affectionate' } }}</li>
+  <li>{{ translations.people | o3rTranslate: { gender: 'female', how: 'influential' } }}</li>
+  <li>{{ translations.people | o3rTranslate: { gender: 'male', how: 'funny' } }}</li>
+  <li>{{ translations.people | o3rTranslate: { how: 'affectionate' } }}</li>
 </ul>
 ```
 
@@ -510,22 +520,23 @@ Note again that *translations.people* matches *global.people* key
 **Output**
 
 ```
-- She is influential  
-- He is funny  
-- They are affectionate  
+- She is influential
+- He is funny
+- They are affectionate
 ```
 
 ## Debugging
 
 ### Runtime: toggle translation on and off
 
-In order to be able to more easily identify which key corresponds to a given text, the ``LocalizationService`` exposes a function ``toggleShowKeys()`` that can be called in order to deactivate or reactivate the translation mechanism at **runtime**.  
+In order to be able to more easily identify which key corresponds to a given text, the ``LocalizationService`` exposes a function ``toggleShowKeys()`` that can be called in order to deactivate or reactivate the translation mechanism at **runtime**.
 While deactivated, the ``translate`` **pipe** and **directive** will output the translation keys instead of their resolved values.
 
-> **Important**: this mechanism only applies to the pipe and directive exported by Otter's ``LocalizationModule``. The original ones from ``ngx-translate`` do not support it.
+> [!IMPORTANT]
+> This mechanism only applies to the pipe and directive exported by Otter's ``LocalizationModule``. The original ones from ``ngx-translate`` do not support it.
 
-First, this mechanism has to be activated via the ``LocalizationConfiguration`` that you can provide in your ``ApplicationModule``.  
-This is mainly for performances reason: the way it works is it adds a new subscription to every ``translate`` pipe and directive in order to know when translations are turned on or off.  
+First, this mechanism has to be activated via the ``LocalizationConfiguration`` that you can provide in your ``ApplicationModule``.
+This is mainly for performances reason: the way it works is it adds a new subscription to every ``translate`` pipe and directive in order to know when translations are turned on or off.
 Not enabling it allows to avoid all those subscriptions, and should be the baseline for a production environment.
 
 Example:
@@ -701,3 +712,13 @@ en-US **fallbacks to** en-GB, as en-GB has the same language with a different re
 fr-BE **fallbacks to** fr-FR, as fr-FR is first in the supported locales list.
 
 it-IT **fallbacks to** en-GB, as it is the default fallback.
+
+## Generators
+
+Otter framework provides a set of code generators based on [angular schematics](https://angular.io/guide/schematics).
+
+| Schematics                     | Description                                                    | How to use                           |
+| ------------------------------ | -------------------------------------------------------------- | ------------------------------------ |
+| add                            | Include Otter localization module in a library / application.  | `ng add @o3r/localization`           |
+| localization-to-component      | Add localization architecture to an Otter component            | `ng g localization-to-component`     |
+| localization-key-to-component  | Add a localization key to an Otter component                   | `ng g localization-key-to-component` |

@@ -2,7 +2,6 @@
 /* eslint-disable quote-props */
 
 module.exports = {
-  'parser': require.resolve('@typescript-eslint/parser'),
   'parserOptions': {
     'tsconfigRootDir': __dirname,
     'project': [
@@ -13,19 +12,72 @@ module.exports = {
   'overrides': [
     {
       'files': [
+        '*.{c,m,}{t,j}s'
+      ],
+      'parser': require.resolve('@typescript-eslint/parser'),
+      'extends': ['@o3r/eslint-config-otter'].map(require.resolve)
+    },
+    {
+      'files': [
         '*{.,-}jasmine.ts'
       ],
       'rules': {
         'jest/no-jasmine-globals': 'off'
       }
+    },
+
+    {
+      'parser': require.resolve('jsonc-eslint-parser'),
+      'files': [
+        '**/*.json'
+      ]
+    },
+    {
+      'files': [
+        '**/package.json'
+      ],
+      'plugins': [
+        '@nx',
+        '@o3r'
+      ],
+      'rules': {
+        '@o3r/json-dependency-versions-harmonize': ['error', {
+          ignoredPackages: ['@o3r/build-helpers'],
+          alignPeerDependencies: false
+        }],
+        '@nx/dependency-checks': ['error', {
+          'buildTargets': ['build', 'build-builders', 'compile', 'test'],
+          'checkObsoleteDependencies': false,
+          'checkVersionMismatches': false,
+          'ignoredDependencies': ['ora', '@o3r/test-helpers']
+        }]
+      }
+    },
+
+    {
+      'parser': require.resolve('yaml-eslint-parser'),
+      'files': [
+        '**/*.y{a,}ml'
+      ]
+    },
+    {
+      'files': [
+        '**/.yarnrc.yml'
+      ],
+      'plugins': [
+        '@o3r'
+      ],
+      'rules': {
+        '@o3r/yarnrc-package-extensions-harmonize': ['error']
+      }
     }
   ],
   'env': {
+    'es2021': true,
     'browser': true,
     'node': true,
     'webextensions': true,
 
-    'es6': true,
     'jasmine': true,
     'jest': true,
     'jest/globals': true
@@ -35,8 +87,5 @@ module.exports = {
   },
   'settings': {
     'import/resolver': 'node'
-  },
-  'extends': [
-    '@o3r/eslint-config-otter'
-  ].map(require.resolve)
+  }
 };

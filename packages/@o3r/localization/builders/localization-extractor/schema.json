@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/schema",
+  "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
   "$id": "LocalizationExtractorBuilderSchema",
   "title": "Localization builder",
@@ -49,6 +49,11 @@
     "sortKeys": {
       "type": "boolean",
       "description": "Sort metadata alphabetically by keys",
+      "default": false
+    },
+    "strictMode": {
+      "type": "boolean",
+      "description": "If activated, this option will fail when any property not supported by the CMS is found, it will be ignored if not activated",
       "default": false
     }
   },

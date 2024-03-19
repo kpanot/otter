@@ -6,7 +6,13 @@
       "path": "./tsconfig.build.json"
     },
     {
+      "path": "./tsconfig.builders.json"
+    },
+    {
       "path": "./tsconfig.spec.json"
+    },
+    {
+      "path": "./tsconfig.cli.json"
     }
   ]
 }

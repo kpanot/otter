@@ -4,7 +4,7 @@ import {ComponentFixture, getTestBed, TestBed} from '@angular/core/testing';
 import {By} from '@angular/platform-browser';
 import {BrowserDynamicTestingModule, platformBrowserDynamicTesting} from '@angular/platform-browser-dynamic/testing';
 import {Store} from '@ngrx/store';
-import {BehaviorSubject, Subject} from 'rxjs';
+import {ReplaySubject, Subject} from 'rxjs';
 import {PlaceholderComponent} from './placeholder.component';
 
 /**
@@ -25,21 +25,30 @@ describe('Placeholder component', () => {
   beforeAll(
     () => getTestBed().platform ||
       TestBed.initTestEnvironment(BrowserDynamicTestingModule, platformBrowserDynamicTesting(), {
-        teardown: { destroyAfterEach: false }
+        teardown: {destroyAfterEach: false}
       }));
 
   let placeholderComponent: ComponentFixture<PlaceholderComponent>;
-  let storeContent: Subject<{ renderedTemplate: string; isPending?: boolean }>;
+  type TemplatesFromStore = {
+    orderedTemplates: {
+      renderedTemplate: (string | undefined);
+      resolvedUrl: string;
+    }[];
+    isPending: boolean;
+  };
+  let storeContent: Subject<TemplatesFromStore>;
   let mockStore: {
     dispatch: jest.Mock;
-    pipe: jest.Mock;
+    select: jest.Mock;
   };
+  const postMessageMock = jest.spyOn(window, 'postMessage');
 
   beforeEach(async () => {
-    storeContent = new BehaviorSubject({renderedTemplate: ''});
+    jest.resetAllMocks();
+    storeContent = new ReplaySubject<TemplatesFromStore>(1);
     mockStore = {
       dispatch: jest.fn(),
-      pipe: jest.fn().mockReturnValue(storeContent)
+      select: jest.fn().mockReturnValue(storeContent)
     };
     await TestBed.configureTestingModule({
       imports: [
@@ -59,7 +68,11 @@ describe('Placeholder component', () => {
     placeholderComponent = TestBed.createComponent(PlaceholderComponent);
 
     storeContent.next({
-      renderedTemplate: '<div>test template</div>'
+      orderedTemplates: [{
+        resolvedUrl: '/test.json',
+        renderedTemplate: '<div>test template</div>'
+      }],
+      isPending: false
     });
 
     placeholderComponent.componentInstance.id = 'testPlaceholder';
@@ -67,6 +80,43 @@ describe('Placeholder component', () => {
 
     expect(placeholderComponent.nativeElement.children[0].tagName).toBe('DIV');
     expect(placeholderComponent.nativeElement.children[0].innerHTML).toEqual('<div>test template</div>');
+    expect(postMessageMock).toHaveBeenCalledWith({
+      type: 'otter',
+      content: {
+        dataType: 'placeholder-loading-status',
+        templateIds: ['/test.json'],
+        placeholderId: 'testPlaceholder'
+      }
+    }, '*');
+  });
+
+  it('should render the templates', () => {
+    placeholderComponent = TestBed.createComponent(PlaceholderComponent);
+
+    storeContent.next({
+      orderedTemplates: [{
+        renderedTemplate: '<div>test template</div>',
+        resolvedUrl: 'assets/test.json'
+      }, {
+        renderedTemplate: '<div>test template 2</div>',
+        resolvedUrl: 'assets/test2.json'
+      }],
+      isPending: false
+    });
+
+    placeholderComponent.componentInstance.id = 'testPlaceholder';
+    placeholderComponent.detectChanges();
+
+    expect(placeholderComponent.nativeElement.children[0].tagName).toBe('DIV');
+    expect(placeholderComponent.nativeElement.children[0].innerHTML).toEqual('<div>test template</div><div>test template 2</div>');
+    expect(postMessageMock).toHaveBeenCalledWith({
+      type: 'otter',
+      content: {
+        dataType: 'placeholder-loading-status',
+        templateIds: ['assets/test.json', 'assets/test2.json'],
+        placeholderId: 'testPlaceholder'
+      }
+    }, '*');
   });
 
   it('should retrieve new template on ID change', () => {
@@ -78,12 +128,14 @@ describe('Placeholder component', () => {
     placeholderComponent.componentInstance.id = 'testPlaceholder2';
     placeholderComponent.detectChanges(true);
 
-    expect(mockStore.pipe).toHaveBeenCalledTimes(2);
+    expect(mockStore.select).toHaveBeenCalledTimes(2);
+    expect(postMessageMock).not.toHaveBeenCalled();
   });
 
   it('isPending status of the placeholder should display the ng-content', () => {
     const testComponentFixture: ComponentFixture<TestComponent> = TestBed.createComponent(TestComponent);
     const contentDisplayed = testComponentFixture.debugElement.query(By.css('o3r-placeholder'));
+    expect(postMessageMock).not.toHaveBeenCalled();
     contentDisplayed.componentInstance.id = 'placeholder1';
 
     // Ensure that the default isPending is set to undefined
@@ -93,15 +145,34 @@ describe('Placeholder component', () => {
     expect(contentDisplayed.query(By.css('span'))).toBe(null);
 
     // Simulate a call to an url to retrieve a placeholder, Loading... should be displayed
-    storeContent.next({renderedTemplate: undefined, isPending: true});
+    storeContent.next({
+      orderedTemplates: [{
+        renderedTemplate: '',
+        resolvedUrl: '/test-empty.json'
+      }],
+      isPending: true
+    });
     testComponentFixture.detectChanges();
-
-    expect(contentDisplayed.query(By.css('span')).nativeElement.innerHTML).toBe('Loading...');
+    expect(postMessageMock).not.toHaveBeenCalled();
+    expect(testComponentFixture.debugElement.query(By.css('span')).nativeElement.innerHTML).toBe('Loading...');
 
     // Simulate the result from the call, setting isPending to false, renderedTemplate should be displayed
-    storeContent.next({renderedTemplate: 'This is the rendered template', isPending: false});
+    storeContent.next({
+      orderedTemplates: [{
+        renderedTemplate: 'This is the rendered template',
+        resolvedUrl: '/test.json'
+      }],
+      isPending: false
+    });
     testComponentFixture.detectChanges();
-
+    expect(postMessageMock).toHaveBeenCalledWith({
+      type: 'otter',
+      content: {
+        dataType: 'placeholder-loading-status',
+        templateIds: ['/test.json'],
+        placeholderId: 'placeholder1'
+      }
+    }, '*');
     expect(contentDisplayed.query(By.css('div')).nativeElement.innerHTML).toBe('This is the rendered template');
   });
 });

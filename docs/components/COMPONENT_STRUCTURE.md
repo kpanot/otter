@@ -42,12 +42,12 @@ There are three folders:
 
 * `container` component folder; It contains the files related to the container component. Check the [container / presenter documentation](./CONTAINER_PRESENTER.md) for more details
 * `presenter` component folder; It contains the files related to the presenter component. Check the [container / presenter documentation](./CONTAINER_PRESENTER.md) for more details
-* `sub-components` folder; A component may be composed of sub-components. They should be located in a dedicated sub-components folder inside the component folder. We want to keep all components which belongs to the same functional area and are not blocks in the same functional folder.
+* `sub-components` folder; A component may be composed of subcomponents. They should be located in a dedicated subcomponents folder inside the component folder. We want to keep all components which belongs to the same functional area and are not blocks in the same functional folder.
 Nevertheless, if a component is shared among different functional blocks, it will have to be set inside the dedicated shared folder (at the root of components folder).
 
 Optionally, there could be other two folders:
 
-* `contracts`; used to contain all shared models or interfaces over your components (between container and presenter, sub-components or other components).
+* `contracts`; used to contain all shared models or interfaces over your components (between container and presenter, subcomponents or other components).
 * `directives`, which contains directives used in the context of your component. Keeping them in a dedicated folder will help you extract them if they have to be extracted in order to be shared.
 
 If you don't need container/presenter structure because your component is only a presentational component, then the structure will be:
@@ -96,7 +96,7 @@ export interface MyComponentContextInput {
 
   input2: TemplateRef<MyComponentPresContext>;
 }
-  
+
 export interface MyComponentContextOutput {
 
   output1: number;
@@ -125,12 +125,12 @@ export  interface MyComponentPresTranslation extends Translation {
 export  const translations: MyComponentPresTranslation = {
   prop1: 'o3r-my-component-pres.somekey1',
   prop2: 'o3r-my-component-pres.somekey2'
-}; 
+};
 ```
 
 ### Localization (`*.localization.json`)
 
-It defines an object beeing key/value pairs. Each value is a json object having `description` and `defaultValue` properties. Eventually you can reference a global key via $ref using relative path to `global-localization.json` which sits in `src` or in different package in dependencies. The purpose of this file is to provide a default localization for component so that library user can start building pages using components without worrying about localization. `*.localization.json` specifies only default values in english.
+It defines an object being key/value pairs. Each value is a json object having `description` and `defaultValue` properties. Eventually you can reference a global key via $ref using relative path to `global-localization.json` which sits in `src` or in different package in dependencies. The purpose of this file is to provide a default localization for component so that library user can start building pages using components without worrying about localization. `*.localization.json` specifies only default values in english.
 
 ```typescript
 {
@@ -198,3 +198,41 @@ We used to export:
 * module
 * context
 * configuration
+
+## Runtime debugging
+
+### Enable Chrome extension debugging
+
+The Otter framework provides an [Otter Chrome Extension](https://chrome.google.com/webstore/detail/otter-devtools/aejabgendbpckkdnjaphhlifbhepmbne) to help debug the application.
+To enable the communication with the [Otter Devtools](../dev-tools/chrome-devtools.md) the two following steps are required:
+
+1. Import the Devtools module into the application AppModule:
+
+```typescript
+import { ComponentsDevtoolsModule } from '@o3r/components';
+
+@NgModule({
+  imports: [
+    ...,
+    ComponentsDevtoolsModule
+  ]
+})
+export class AppModule { }
+```
+
+2. Activate the debug message service:
+
+```typescript
+import { ComponentsDevtoolsMessageService } from '@o3r/components';
+
+@Component({ ... })
+export class AppComponent {
+  constructor(componentsDevtoolsMessageService: ComponentsDevtoolsMessageService) {
+    if (IS_DEBUG_MODE) {
+      componentsDevtoolsMessageService.activate();
+    }
+  }
+}
+```
+
+> **Note**: get more details on [dev tools session](../dev-tools/chrome-devtools.md)

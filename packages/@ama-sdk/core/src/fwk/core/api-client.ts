@@ -1,7 +1,7 @@
 import {RequestBody, RequestMetadata, RequestOptions, TokenizedOptions} from '../../plugins/index';
-import { ApiTypes } from '../api';
-import { ReviverType } from '../Reviver';
-import { BaseApiClientOptions } from './base-api-constructor';
+import {ApiTypes} from '../api';
+import {ReviverType} from '../Reviver';
+import {BaseApiClientOptions} from './base-api-constructor';
 
 /**
  * API Client used by the SDK's APIs to call the server
@@ -13,7 +13,6 @@ export interface ApiClient {
 
   /**
    * Returns a map containing the query parameters
-   *
    * @param data
    * @param names
    */
@@ -25,24 +24,22 @@ export interface ApiClient {
 
   /**
    * prepares the url to be called
-   *
    * @param url base url to be used
    * @param queryParameters key value pair with the parameters. If the value is undefined, the key is dropped
    */
   prepareUrl(url: string, queryParameters?: { [key: string]: string | undefined }): string;
 
 
-/**
- * Returns tokenized request options:
- * URL/query parameters for which sensitive parameters are replaced by tokens and the corresponding token-value associations
- *
- * @param tokenizedUrl URL for which parameters containing PII have been replaced by tokens
- * @param queryParameters Original query parameters
- * @param piiParamTokens Tokens of the parameters containing PII
- * @param data Data to provide to the API call
- * @returns the tokenized request options if tokenization is enabled, undefined otherwise
- */
-  tokenizeRequestOptions(url: string, queryParameters: { [key: string]: string | undefined }, piiParamTokens:{ [key: string]: string }, data: any): TokenizedOptions | undefined;
+  /**
+   * Returns tokenized request options:
+   * URL/query parameters for which sensitive parameters are replaced by tokens and the corresponding token-value associations
+   * @param tokenizedUrl URL for which parameters containing PII have been replaced by tokens
+   * @param queryParameters Original query parameters
+   * @param piiParamTokens Tokens of the parameters containing PII
+   * @param data Data to provide to the API call
+   * @returns the tokenized request options if tokenization is enabled, undefined otherwise
+   */
+  tokenizeRequestOptions(url: string, queryParameters: { [key: string]: string | undefined }, piiParamTokens: { [statusCode: string]: string }, data: any): TokenizedOptions | undefined;
 
   /**
    * Receives an object containing key/value pairs
@@ -51,13 +48,12 @@ export interface ApiClient {
   processFormData(data: any, type: string): FormData | string;
 
   /** Process HTTP call */
-  processCall<T>(url: string, options: RequestOptions, apiType: ApiTypes | string, apiName: string, reviver?: ReviverType<T> | undefined, operationId?: string): Promise<T>;
-
+  processCall<T>(url: string, options: RequestOptions, apiType: ApiTypes | string, apiName: string, revivers?: ReviverType<T> | undefined |
+    {[key: number]: ReviverType<T> | undefined}, operationId?: string): Promise<T>;
 }
 
 /**
  * Check if the object is an Api Client object
- *
  * @param client object to check
  */
 export function isApiClient(client: any): client is ApiClient {

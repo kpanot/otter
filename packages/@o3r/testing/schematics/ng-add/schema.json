@@ -1,8 +1,8 @@
 {
-  "$schema": "http://json-schema.org/schema",
+  "$schema": "http://json-schema.org/draft-07/schema",
   "$id": "ngAddSchematicsSchema",
   "title": "Add Otter testing ",
-  "description": "ngAdd Otter testing ",
+  "description": "ngAdd Otter testing",
   "properties": {
     "projectName": {
       "type": "string",
@@ -10,9 +10,26 @@
       "$default": {
         "$source": "projectName"
       }
+    },
+    "testingFramework": {
+      "type": "string",
+      "description": "The framework for Unit Tests to use",
+      "enum": [
+        "jest",
+        "other"
+      ]
+    },
+    "enablePlaywright": {
+      "type": "boolean",
+      "description": "Install playwright"
+    },
+    "exactO3rVersion": {
+      "type": "boolean",
+      "description": "Use a pinned version for otter packages",
+      "default": false
     }
   },
-  "additionalProperties": false,
+  "additionalProperties": true,
   "required": [
   ]
 }

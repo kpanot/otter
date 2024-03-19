@@ -1,19 +1,19 @@
+import type { Logger } from '@o3r/logger';
 import { BehaviorSubject, firstValueFrom, merge, Observable, of } from 'rxjs';
 import { delay, distinctUntilChanged, shareReplay, switchMap, takeUntil, tap } from 'rxjs/operators';
 import { EngineDebugger } from './debug/engine.debug';
 import { FactObject, RulesEngineOptions } from './engine.interface';
-import { Fact } from './fact/index';
+import type { Fact, Facts } from './fact/index';
 import { filterRulesetsEventStream } from './helpers/filter-ruleset-event.operator';
 import { Operator, operatorList, UnaryOperator } from './operator/index';
 import { RulesetExecutor } from './ruleset-executor';
 import { ActionBlock, Ruleset } from './structure';
-import type { Logger} from '@o3r/logger';
 
 /** Rules engine */
 export class RulesEngine {
 
   /** Map of registered fact stream, this map is mutated by the ruleset executors */
-  private factMap: Record<string, FactObject<any>> = {};
+  private readonly factMap: Record<string, FactObject<any>> = {};
 
   /** Subject containing the rulesets and the results stream*/
   private readonly rulesetMapSubject = new BehaviorSubject<Record<string, RulesetExecutor>>({});
@@ -37,7 +37,6 @@ export class RulesEngine {
 
   /**
    * Performance reporter to use for performance measurements.
-   *
    * @default window.performance on browser only, undefined on node
    */
   public readonly performance;
@@ -55,7 +54,6 @@ export class RulesEngine {
 
   /**
    * Rules engine
-   *
    * @param options rules engine options
    * @param logger
    */
@@ -88,7 +86,6 @@ export class RulesEngine {
 
   /**
    * Attach debug events to actions stream if debug engine is activated
-   *
    * @param actionsStream
    */
   private handleActionsStreamOutput<T extends ActionBlock = ActionBlock>(): (actionsStream$: Observable<T[]>) => Observable<T[]> {
@@ -97,7 +94,6 @@ export class RulesEngine {
 
   /**
    * Create the actions stream event based on provided active rulesets ids; Handle debug too
-   *
    * @param ruleSets
    */
   private prepareActionsStream<T extends ActionBlock = ActionBlock>(ruleSets?: string[]): (rulesetMapSubject$: Observable<Record<string, RulesetExecutor>>) => Observable<T[]> {
@@ -111,11 +107,10 @@ export class RulesEngine {
   /**
    * Create or retrieve a fact stream
    * The fact stream created will be registered in the engine
-   *
    * @param id ID of the fact to retrieve
    * @param factValue$ Value stream for the fact
    */
-  public retrieveOrCreateFactStream<T = unknown>(id: string, factValue$?: Observable<T>): Observable<T | undefined> {
+  public retrieveOrCreateFactStream<T = Facts>(id: string, factValue$?: Observable<T>): Observable<T | undefined> {
     // trick to emit undefined if the observable is not immediately emitting (to not bloc execution)
     const obs$ = factValue$ ?
       merge(factValue$, of(undefined).pipe(delay(this.factDefaultDelay || 0), takeUntil(factValue$))) :
@@ -146,7 +141,6 @@ export class RulesEngine {
   /**
    * Retrieve the promise of the latest value of a fact.
    * Return undefined if the fact is not defined.
-   *
    * @param id ID of the fact to retrieve
    */
   public retrieveFactValue<T = unknown>(id: string): Promise<T | undefined> | undefined {
@@ -155,7 +149,6 @@ export class RulesEngine {
 
   /**
    * Update or insert fact in rules engine
-   *
    * @param facts fact list to add / update
    */
   public upsertFacts<T = unknown>(facts: Fact<T> | Fact<T>[]) {
@@ -166,7 +159,6 @@ export class RulesEngine {
 
   /**
    * Update or insert rule in rules engine
-   *
    * @param rules rule list to add / update
    * @param rulesets
    */
@@ -183,7 +175,6 @@ export class RulesEngine {
 
   /**
    * Update or insert operator in rules engine
-   *
    * @param operators operator list to add / update
    */
   public upsertOperators(operators: (Operator | UnaryOperator)[]) {

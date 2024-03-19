@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/schema",
+  "$schema": "http://json-schema.org/draft-07/schema",
   "$id": "LocalizationBuilderSchema",
   "title": "Localization builder",
   "description": "Localization builder options",
@@ -14,8 +14,7 @@
     },
     "outputPath": {
       "type": "string",
-      "description": "Output path to localization bundles",
-      "default": "."
+      "description": "Output path to localization bundles"
     },
     "locales": {
       "type": "array",
@@ -44,19 +43,16 @@
     "assets": {
       "oneOf": [
         {
-          "type": "string",
-          "default": null
+          "type": "string"
         },
         {
           "type": "array",
           "items": {
             "type": "string"
-          },
-          "default": null
+          }
         }
       ],
-      "description": "Asset folder containing the package translations",
-      "default": null
+      "description": "Asset folder containing the package translations"
     },
     "checkUnusedTranslation": {
       "type": "boolean",

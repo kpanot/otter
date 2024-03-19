@@ -27,7 +27,7 @@ const logger = winston.createLogger({
 });
 
 program
-  .description('Update package.json exports')
+  .description('[DEPRECATED] Update package.json exports')
   .option<string>('--cwd <path>', 'Path to the root of the project', (rootPath) => path.resolve(process.cwd(), rootPath), process.cwd())
   .option<string>('-o, --outDir <path>', 'Path to folder containing the package.json to edit',
     (folderPath) => folderPath,
@@ -47,6 +47,8 @@ program
   )
   .option('-v, --verbose', 'Display debug logs')
   .parse(process.argv);
+
+logger.warn('This script is deprecated, will be removed in Otter v12.');
 
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
 const { cwd, pattern, exportTypes, ...options} = program.opts() as Options;
@@ -77,17 +79,17 @@ const editPackageJson = async () => {
   logger.debug(`Parsed original ${originPackageJsonPath}`);
 
   packageJson.exports ||= {};
-  packageJson.exports['./package.json'] ||= originPackageJson.exports?.['./package.json'] || { default: './package.json' };
-  packageJson.exports['.'] ||= originPackageJson.exports?.['.'] || {
+  (packageJson.exports as Record<string, PackageJson.Exports>)['./package.json'] ||= (packageJson.exports as Record<string, PackageJson.Exports>)?.['./package.json'] || { default: './package.json' };
+  (packageJson.exports as Record<string, PackageJson.Exports>)['.'] ||= (packageJson.exports as Record<string, PackageJson.Exports>)?.['.'] || {
     ...exportTypes.reduce<Record<string, string | undefined>>((acc, type) => ({ ...acc, [type]: originPackageJson[type] as string | undefined }), {}),
     default: originPackageJson.main || './index.js',
-    node: ((originPackageJson as any).node || originPackageJson.main) as string | undefined
+    node: (originPackageJson.node || originPackageJson.main) as PackageJson.Exports
   };
 
   const subPackagesPath = await globby(path.posix.join('**', pattern), { cwd: srcDir });
   logger.debug(`${subPackagesPath.length} sub entries found (pattern: "${path.posix.join('**', pattern)}" in ${srcDir}):`);
   subPackagesPath.forEach((subPackagePath) => logger.debug(`sub entry: ${subPackagePath}`));
-  const exportMap = subPackagesPath.reduce((acc, subPackagePathRelative) => {
+  const exportMap = subPackagesPath.reduce<Record<string, any>>((acc, subPackagePathRelative) => {
     const subPackagePath = path.join(srcDir, subPackagePathRelative);
     const subPackage = JSON.parse(readFileSync(subPackagePath, { encoding: 'utf8' })) as PackageJson;
     const relativePath = ('./' + path.relative(srcDir, path.dirname(subPackagePath))).split(path.sep).join(path.posix.sep);

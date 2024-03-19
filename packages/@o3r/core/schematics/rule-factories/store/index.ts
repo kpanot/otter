@@ -1,68 +1,101 @@
 import { chain, Rule, SchematicContext, Tree } from '@angular-devkit/schematics';
-import * as ts from '@schematics/angular/third_party/github.com/Microsoft/TypeScript/lib/typescript';
-import { addImportToModule, getDecoratorMetadata, insertImport, isImported } from '@schematics/angular/utility/ast-utils';
-import { addPackageJsonDependency, NodeDependency, NodeDependencyType } from '@schematics/angular/utility/dependencies';
+import {
+  getAppModuleFilePath,
+  getExternalDependenciesVersionRange,
+  getModuleIndex,
+  getProjectNewDependenciesTypes,
+  getWorkspaceConfig,
+  isApplicationThatUsesRouterModule,
+  insertBeforeModule as o3rInsertBeforeModule,
+  insertImportToModuleFile as o3rInsertImportToModuleFile,
+  type SetupDependenciesOptions
+} from '@o3r/schematics';
+import { WorkspaceProject } from '@o3r/schematics';
+import { addRootImport } from '@schematics/angular/utility';
+import { isImported } from '@schematics/angular/utility/ast-utils';
 import * as path from 'node:path';
+import * as ts from 'typescript';
+import * as fs from 'node:fs';
 
-import { getAppModuleFilePath, getExternalDependenciesVersionRange, getNodeDependencyList, getProjectFromTree, isApplicationThatUsesRouterModule } from '@o3r/schematics';
-import { InsertChange } from '@schematics/angular/utility/change';
+const coreSchematicsFolder = path.resolve(__dirname, '..', '..');
+const corePackageJsonPath = path.resolve(coreSchematicsFolder, '..', 'package.json');
+const corePackageJsonContent = JSON.parse(fs.readFileSync(corePackageJsonPath, { encoding: 'utf-8' }));
+const o3rCoreVersion = corePackageJsonContent.version;
 
-const packageJsonPath = path.resolve(__dirname, '..', '..', '..', 'package.json');
 const ngrxEffectsDep = '@ngrx/effects';
 const ngrxEntityDep = '@ngrx/entity';
 const ngrxStoreDep = '@ngrx/store';
-const ngrxStoreLocalstorageDep = 'ngrx-store-localstorage';
 const ngrxRouterStore = '@ngrx/router-store';
+const ngrxRouterStoreDevToolDep = '@ngrx/store-devtools';
 
 /**
  * Add Redux Store support
- *
  * @param options @see RuleFactory.options
  * @param rootPath @see RuleFactory.rootPath
  * @param options.projectName
- * @param _rootPath
+ * @param options.workingDirectory
+ * @param projectType
+ * @param options.dependenciesSetupConfig
+ * @param options.workingDirector
  */
-export function updateStore(options: { projectName: string | null }, _rootPath: string): Rule {
+export function updateStore(
+  options: { projectName?: string | undefined; workingDirector?: string | undefined; dependenciesSetupConfig: SetupDependenciesOptions; exactO3rVersion?: boolean },
+  projectType?: WorkspaceProject['projectType']): Rule {
+
+  const addStoreModules: Rule = (tree) => {
+    const workspaceConfig = getWorkspaceConfig(tree);
+    const workspaceProject = options.projectName && workspaceConfig?.projects?.[options.projectName] || undefined;
+
+    const storeSyncPackageName = '@o3r/store-sync';
+
+    options.dependenciesSetupConfig.dependencies[storeSyncPackageName] = {
+      inManifest: [{
+        range: `${options.exactO3rVersion ? '' : '~'}${o3rCoreVersion}`,
+        types: getProjectNewDependenciesTypes(workspaceProject)
+      }],
+      ngAddOptions: { exactO3rVersion: options.exactO3rVersion }
+    };
+    (options.dependenciesSetupConfig.ngAddToRun ||= []).push(storeSyncPackageName);
+  };
+
   /**
-   * Changed package.json start script to run localization generation
-   *
+   * Change package.json with the new dependencies
    * @param tree
-   * @param _context
    */
-  const updatePackageJson: Rule = (tree: Tree, context: SchematicContext) => {
-    const workspaceProject = getProjectFromTree(tree, options.projectName || undefined);
-    const type: NodeDependencyType = workspaceProject.projectType === 'application' ? NodeDependencyType.Default : NodeDependencyType.Peer;
+  const updatePackageJson: Rule = (tree: Tree) => {
+    const workspaceConfig = getWorkspaceConfig(tree);
+    const workspaceProject = options.projectName && workspaceConfig?.projects?.[options.projectName] || undefined;
 
-    let dependenciesList = [ngrxEffectsDep, ngrxEntityDep, ngrxStoreDep, ngrxStoreLocalstorageDep];
-    dependenciesList = isApplicationThatUsesRouterModule(tree) ? [...dependenciesList, ngrxRouterStore] : dependenciesList;
-    try {
-      const dependencies: NodeDependency[] = getNodeDependencyList(
-        getExternalDependenciesVersionRange(dependenciesList, packageJsonPath),
-        type
-      );
-      dependencies.forEach((dep) => addPackageJsonDependency(tree, dep));
-    } catch (e: any) {
-      context.logger.warn(`Could not find generatorDependency ${dependenciesList.join(', ')} in file ${packageJsonPath}`);
-    }
+    const appDeps = [ngrxEffectsDep, ngrxRouterStore, ngrxRouterStoreDevToolDep];
+    const corePeerDeps = [ngrxEntityDep, ngrxStoreDep];
+    const dependenciesList = projectType === 'application' ? [...corePeerDeps, ...appDeps] : [...corePeerDeps];
 
-    return tree;
+    Object.entries(getExternalDependenciesVersionRange(dependenciesList, corePackageJsonPath)).forEach(([dep, range]) => {
+      options.dependenciesSetupConfig.dependencies[dep] = {
+        inManifest: [{
+          range,
+          types: getProjectNewDependenciesTypes(workspaceProject)
+        }]
+      };
+    });
   };
 
   /**
    * Edit main module with the translation required configuration
-   *
    * @param tree
    * @param context
    */
   const registerModules: Rule = (tree: Tree, context: SchematicContext) => {
-    const moduleFilePath = getAppModuleFilePath(tree, context);
+    const additionalRules: Rule[] = [];
+    const moduleFilePath = getAppModuleFilePath(tree, context, options.projectName);
     if (!moduleFilePath) {
       return tree;
     }
+    const sourceFileContent = tree.readText(moduleFilePath);
 
     const sourceFile = ts.createSourceFile(
       moduleFilePath,
-      tree.read(moduleFilePath)!.toString(),
+      sourceFileContent,
       ts.ScriptTarget.ES2015,
       true
     );
@@ -72,53 +105,17 @@ export function updateStore(options: { projectName: string | null }, _rootPath: 
       return tree;
     }
 
-    const recorder = tree.beginUpdate(moduleFilePath);
-    const ngModulesMetadata = getDecoratorMetadata(sourceFile, 'NgModule', '@angular/core');
-    const appModuleFile = tree.read(moduleFilePath)!.toString();
-    const moduleIndex = ngModulesMetadata[0] ? ngModulesMetadata[0].pos - ('NgModule'.length + 1) : appModuleFile.indexOf('@NgModule');
+    let recorder = tree.beginUpdate(moduleFilePath);
+    const { moduleIndex } = getModuleIndex(sourceFile, sourceFileContent);
 
-    /**
-     * Insert import on top of the main module file
-     *
-     * @param name
-     * @param file
-     * @param isDefault
-     */
-    const insertImportToModuleFile = (name: string, file: string, isDefault?: boolean) => {
-      const importChange = insertImport(sourceFile, moduleFilePath, name, file, isDefault);
-      if (importChange instanceof InsertChange) {
-        recorder.insertLeft(importChange.pos, importChange.toAdd);
-      }
-    };
+    const addImportToModuleFile = (name: string, file: string, moduleFunction?: string) => additionalRules.push(
+      addRootImport(options.projectName!, ({code, external}) => code`${external(name, file)}${moduleFunction}`)
+    );
 
-    /**
-     * Add import to the main module
-     *
-     * @param name
-     * @param file
-     * @param moduleFunction
-     */
-    const addImportToModuleFile = (name: string, file: string, moduleFunction?: string) => {
-      if (new RegExp(name).test(appModuleFile.substr(moduleIndex))) {
-        context.logger.warn(`Skipped ${name} (already imported)`);
-        return;
-      }
-      addImportToModule(sourceFile, moduleFilePath, name, file)
-        .forEach((change) => {
-          if (change instanceof InsertChange) {
-            recorder.insertLeft(change.pos, moduleFunction && change.pos > moduleIndex ? change.toAdd.replace(name, name + moduleFunction) : change.toAdd);
-          }
-        });
-    };
+    const insertImportToModuleFile = (name: string, file: string, isDefault?: boolean) =>
+      recorder = o3rInsertImportToModuleFile(name, file, sourceFile, recorder, moduleFilePath, isDefault);
 
-    /**
-     * Add custom code before the module definition
-     *
-     * @param line
-     */
-    const insertBeforeModule = (line: string) => {
-      recorder.insertLeft(moduleIndex - 1, `${line}\n\n`);
-    };
+    const insertBeforeModule = (line: string) => recorder = o3rInsertBeforeModule(line, sourceFileContent, recorder, moduleIndex);
 
     addImportToModuleFile(
       'EffectsModule',
@@ -131,15 +128,12 @@ export function updateStore(options: { projectName: string | null }, _rootPath: 
       '.forRoot(rootReducers, {metaReducers, runtimeChecks})'
     );
 
-    insertImportToModuleFile('StorageSync', '@o3r/core');
+    insertImportToModuleFile('StorageSync', '@o3r/store-sync');
     insertImportToModuleFile('RuntimeChecks', '@ngrx/store');
-    insertImportToModuleFile('Action', '@ngrx/store');
-    insertImportToModuleFile('ActionReducer', '@ngrx/store');
     insertImportToModuleFile('Serializer', '@o3r/core');
-    insertImportToModuleFile('localStorageSync', 'ngrx-store-localstorage');
     insertImportToModuleFile('environment', '../environments/environment');
 
-    if (isApplicationThatUsesRouterModule(tree)) {
+    if (isApplicationThatUsesRouterModule(tree, options)) {
       addImportToModuleFile(
         'StoreRouterConnectingModule',
         '@ngrx/router-store',
@@ -155,7 +149,7 @@ const storageSync = new StorageSync({
 });
 
 const rootReducers = {
-  ${isApplicationThatUsesRouterModule(tree) ? 'router: routerReducer' : ''}
+  ${isApplicationThatUsesRouterModule(tree, options) ? 'router: routerReducer' : ''}
 };
 
 const metaReducers = [storageSync.localStorageSync()];
@@ -170,11 +164,11 @@ const runtimeChecks: Partial<RuntimeChecks> = {
 
     tree.commitUpdate(recorder);
 
-    return tree;
+    return chain(additionalRules)(tree, context);
   };
 
   return chain([
-    updatePackageJson,
-    registerModules
+    ...(projectType === 'application' ? [registerModules, addStoreModules] : []),
+    updatePackageJson
   ]);
 }

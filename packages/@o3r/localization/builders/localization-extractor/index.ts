@@ -1,4 +1,6 @@
 import { BuilderOutput, createBuilder } from '@angular-devkit/architect';
+import { createBuilderWithMetricsIfInstalled, validateJson } from '@o3r/extractors';
+import { O3rCliError } from '@o3r/schematics';
 import * as chokidar from 'chokidar';
 import * as fs from 'node:fs';
 import { sync as globbySync } from 'globby';
@@ -7,13 +9,12 @@ import { LibraryMetadataMap, LocalizationExtractor, LocalizationFileMap } from '
 import { LocalizationExtractorBuilderSchema } from './schema';
 import { validators } from './validations';
 
-
 export * from './schema';
 
-export default createBuilder<LocalizationExtractorBuilderSchema>(async (options, context): Promise<BuilderOutput> => {
+export default createBuilder(createBuilderWithMetricsIfInstalled<LocalizationExtractorBuilderSchema>(async (options, context): Promise<BuilderOutput> => {
   context.reportRunning();
 
-  const localizationExtractor = new LocalizationExtractor(path.resolve(context.workspaceRoot, options.tsConfig), context.logger);
+  const localizationExtractor = new LocalizationExtractor(path.resolve(context.workspaceRoot, options.tsConfig), context.logger, options);
   const cache: { libs: LibraryMetadataMap; locs: LocalizationFileMap } = {libs: {}, locs: {}};
 
   const execute = async (isFirstLoad = true, files?: { libs?: string[]; locs?: string[]; extraFiles?: string[] }): Promise<BuilderOutput> => {
@@ -70,8 +71,15 @@ export default createBuilder<LocalizationExtractorBuilderSchema>(async (options,
           validators.reduce<boolean>((isInvalid, validator) => isInvalid || !validator(metadataItem.value!), false)
         );
       if (translationsWithIssue.length) {
-        throw new Error(`The following translations are invalid: ${translationsWithIssue.map((translation) => translation.key).join(', ')}`);
+        throw new O3rCliError(`The following translations are invalid: ${translationsWithIssue.map((translation) => translation.key).join(', ')}`);
       }
+
+      validateJson(
+        metadata,
+        require('../../schemas/localization.metadata.schema.json'),
+        'The output of localization metadata is not valid regarding the json schema, please check the details below : \n',
+        options.strictMode
+      );
 
       context.reportProgress(STEP_NUMBER, STEP_NUMBER, 'Generating metadata');
 
@@ -114,7 +122,6 @@ export default createBuilder<LocalizationExtractorBuilderSchema>(async (options,
 
   /**
    * Run a translation generation and report the result
-   *
    * @param execution Execution process
    */
   const generateWithReport = async (execution: Promise<BuilderOutput>) => {
@@ -198,4 +205,4 @@ export default createBuilder<LocalizationExtractorBuilderSchema>(async (options,
       tsWatcher.on('error', (err) => reject(err));
     });
   }
-});
+}));

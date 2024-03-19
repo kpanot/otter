@@ -9,8 +9,8 @@ This will make it possible to implement extensions of Swagger specification or t
 
 Usage of the tools is explained via the `--help` option :
 
-```bash
-$ npx @ama-sdk/swagger-build --help
+```shell
+npx @ama-sdk/swagger-build --help
 # Usage: swagger-build [options] [(swagger-spec|api-configuration|npm-package|glob)...]
 # Merge swagger spec in inputs. The inputs can be `swagger file`, `api configuration file` or `npm package`
 # Options:
@@ -53,10 +53,11 @@ The **Swagger Builder** supports two kinds of configuration:
 1. The configuration via CLI `options` (described in the usage output)
 2. The configuration via a `json` file.
 
-The **Swagger Builder** supports a set of *configuration* to configure the merging strategy, the post processing and the output format.
+The **Swagger Builder** supports a set of *configuration* to configure the merging strategy, the post-processing and the output format.
 
 The configurations can be specified in a JSON file following a provided [Json Schema](./packages/@ama-sdk/swagger-builder/src/schemas/builder-configuration.schema.json) or via CLI options.
-> **Warning**: The CLI Options will **be overridden by** the configuration provided in the JSON file.
+> [!WARNING]
+> The CLI Options will **be overridden by** the configuration provided in the JSON file.
 ### List of available configurations
 
 | Configuration           | CLI Option                             | Description                                                                                                                                                                                                                                                                    | Default value |
@@ -81,7 +82,7 @@ The configurations can be specified in a JSON file following a provided [Json Sc
 
 | Feature           | CLI Option                          | Description                                                                                                                                                 | Default value |
 | :---------------- | :---------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------ |
-| **Configuration** | **--configuration** (alias: **-c**) | [Configuration file](#List-of-available-configurations) to provide parameters to the **Swagger Builder**                                                    | *null*        |
+| **Configuration** | **--configuration** (alias: **-c**) | [Configuration file](#list-of-available-configurations) to provide parameters to the **Swagger Builder**                                                    | *null*        |
 | **APIs**          | **--apis**                          | Path to the files containing a [list of APIs](./multi-apis.md) to generate. Each APIs will be merged with the ones in the CLI argument (if specified). | *null*        |
 
 ## Additional Checking tools
@@ -96,11 +97,8 @@ To perform validity check of a set of Swagger Specifications, additional tools a
 
 ## Generate your own extension
 
-A code generator is provided to generate an extension of the **Amadeus Digital Experience API**.
+A code generator is provided to generate an API specification extension.
 
-```bash
-yarn yo @ama-sdk/sdk:api-extension
+```shell
+yarn dlx -p @angular-devkit/schematics-cli schematics @ama-sdk/schematics:api-extension
 ```
-
-> More information on [Generators documentation](../../README.md).
->

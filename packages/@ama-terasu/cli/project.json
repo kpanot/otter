@@ -7,49 +7,34 @@
   "targets": {
     "build": {
       "executor": "nx:run-script",
-      "outputs": [
-        "{projectRoot}/dist/package.json"
-      ],
+      "outputs": ["{projectRoot}/dist/package.json"],
       "options": {
         "script": "postbuild"
       },
-      "dependsOn": [
-        "compile"
-      ]
+      "dependsOn": ["compile"]
     },
     "compile": {
-      "executor": "@nrwl/js:tsc",
-      "outputs": [
-        "{projectRoot}/dist",
-        "{projectRoot}/build/.tsbuildinfo"
-      ],
+      "executor": "@nx/js:tsc",
+      "outputs": ["{projectRoot}/dist", "{projectRoot}/build/.tsbuildinfo"],
       "options": {
         "main": "packages/@ama-terasu/cli/src/public_api.ts",
         "tsConfig": "packages/@ama-terasu/cli/tsconfig.build.json",
-        "outputPath": "packages/@ama-terasu/cli/dist",
-        "updateBuildableProjectDepsInPackageJson": false
+        "outputPath": "packages/@ama-terasu/cli/dist"
       }
     },
     "lint": {
-      "executor": "@nrwl/linter:eslint",
-      "configurations": {
-        "ci": {
-          "quiet": true,
-          "cacheLocation": ".cache/eslint"
-        }
-      },
       "options": {
         "eslintConfig": "packages/@ama-terasu/cli/.eslintrc.js",
         "lintFilePatterns": [
-          "packages/@ama-terasu/cli/src/**/*.ts"
+          "packages/@ama-terasu/cli/src/**/*.ts",
+          "packages/@ama-terasu/cli/package.json"
         ]
       }
     },
     "test": {
-      "executor": "@nrwl/jest:jest",
+      "executor": "@nx/jest:jest",
       "options": {
-        "jestConfig": "packages/@ama-terasu/cli/jest.config.js",
-        "silent": true
+        "jestConfig": "packages/@ama-terasu/cli/jest.config.js"
       }
     },
     "prepare-publish": {

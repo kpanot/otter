@@ -1,3 +1,5 @@
+import type { Observable } from 'rxjs';
+
 /**
  * Types available for configuration
  */
@@ -12,30 +14,11 @@ export interface NestedConfiguration {
 }
 
 /**
- * @Deprecated will be removed in v10. Please use Configuration instead
- * Generic configuration
- */
-export interface LegacyConfiguration {
-  [key: string]: ConfigurationValueType | Partial<LegacyConfiguration> | (ConfigurationValueType | Partial<LegacyConfiguration>)[] | undefined;
-}
-
-/**
  * Interface of configuration that is supported by the cms
  */
-export interface StrictConfiguration {
+export interface Configuration {
   [key: string]: ConfigurationValueType | (string | NestedConfiguration)[];
 }
-
-/**
- * Configuration mode
- */
-export type ConfigurationMode = 'legacy' | 'strict';
-
-/**
- * Interface of configuration that is supported by the cms
- * NOTE: specify "legacy" as parameter type to disable strict mode and allow values not supported by the CMS. This option is strongly not recommended and deprecated.
- */
-export type Configuration<T extends ConfigurationMode = 'strict'> = T extends 'strict' ? StrictConfiguration : LegacyConfiguration;
 
 /** Configuration model exported by the CMS */
 export interface CustomConfig<T extends Partial<Configuration> = Partial<Configuration>> {
@@ -51,6 +34,34 @@ export interface CustomConfig<T extends Partial<Configuration> = Partial<Configu
 }
 
 /**
+ * Dynamically Configurable item
+ */
+// eslint-disable-next-line no-use-before-define
+export interface DynamicConfigurable<T extends Configuration> {
+  /**
+   * Configuration override
+   */
+  config: Partial<T> | undefined;
+
+  /**
+   * Configuration stream
+   */
+  config$: Observable<T>;
+}
+
+/**
+ * Configurable item
+ */
+// eslint-disable-next-line @typescript-eslint/ban-types
+export interface Configurable<T extends {}> {
+  /**
+   * Configuration
+   */
+  config: T;
+}
+
+
+/**
  * Description of a configuration property extracted to the CMS
  */
 export interface CategoryDescription {
@@ -63,3 +74,20 @@ export interface CategoryDescription {
 
 /** Types of components config */
 export type ConfigType = 'Block' | 'Page' | 'AppRuntimeConfiguration' | 'AppBuildConfiguration' | 'ExposedComponent';
+
+/**
+ * Interface to define widget parameter to be used on CMS side
+ */
+export interface ConfigPropertyWidgetParameters {
+  [parameterName: string]: string | boolean | number | string[] | boolean[] | number[];
+}
+
+/**
+ * Interface to define the widget to be used on CMS side
+ */
+export interface ConfigPropertyWidget {
+  /** Type of the CMS widget */
+  type: string;
+  /** Parameters provided to the CMS widget */
+  parameters?: ConfigPropertyWidgetParameters;
+}

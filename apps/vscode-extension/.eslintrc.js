@@ -5,7 +5,6 @@ module.exports = {
   'root': true,
   'parserOptions': {
     'projectFolderIgnoreList': [
-      '**/node_modules/**',
       '**/templates/**'
     ],
     'tsconfigRootDir': __dirname,

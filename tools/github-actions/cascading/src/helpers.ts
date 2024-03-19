@@ -2,14 +2,13 @@ import type {BaseLogger} from './cascading';
 
 /**
  * Sort branches according to semantic versioning
- *
  * @param branches
  */
 export function sortBranches(branches: string[]) {
   return branches.map(branch => {
     const extract = branch.match(/release\/([0-9]+)\.([0-9]+)/);
     if (!extract) {
-      throw new Error(`Format of branch doesnt match the release pattern ${branches.join(',')}`);
+      throw new Error(`Format of branch does not match the release pattern ${branches.join(',')}`);
     }
     return {
       maj: parseInt(extract[1], 10),
@@ -27,8 +26,7 @@ export function sortBranches(branches: string[]) {
 }
 
 /**
- * Extract just the branches matching the release/min.maj[.0-alpha|beta|next|rc] format
- *
+ * Extract just the branches matching the release/min.maj[.0-next|prerelease|rc] format
  * @param gitOutput
  */
 export function extractBranchesFromGitOutput(gitOutput: string) {
@@ -37,12 +35,11 @@ export function extractBranchesFromGitOutput(gitOutput: string) {
       .replace(/ /g, '')
       .replace('remotes/origin/', '')
     )
-    .filter((val) => /release\/(0|[1-9]\d*)\.(0|[1-9]\d*)(\.0-(alpha|beta|next|rc))?$/.test(val));
+    .filter((val) => /release\/(0|[1-9]\d*)\.(0|[1-9]\d*)(\.0-(next|prerelease|rc))?$/.test(val));
 }
 
 /**
  * Extract the packages names from a multi-line string coming from a git diff
- *
  * @param diffOutput
  */
 export function extractPackageLine(diffOutput: string): string[] {
@@ -54,7 +51,6 @@ export function extractPackageLine(diffOutput: string): string[] {
  * Extract the list of old and new packages from a multi-line string coming from a git diff
  * old packages are the packages between '<<<<<<< HEAD' and '======='
  * new packages are the packages between '=======' and '>>>>>>>'
- *
  * @param diffOutput
  */
 export function extractPackages(diffOutput: string): { oldPackages: string[]; newPackages: string[] } {
@@ -73,7 +69,6 @@ export function extractPackages(diffOutput: string): { oldPackages: string[]; ne
 /**
  * This function is just meant to handle the result object, it's a bit of boilerplate since we cannot rely on stderr/stdout because
  * Git is logging on stderr even if the result is successful, but the exit code is still relevant : we just rely on it for errors
- *
  * @param promise
  * @param logger
  */
@@ -86,8 +81,7 @@ export async function handlePromisifiedExecLog<T extends BaseLogger>(promise: Pr
 
 /**
  *
- *  Extract the list of package changes from git diff output result
- *
+ *Extract the list of package changes from git diff output result
  * @param gitDiffResult
  * @param logger
  */
@@ -112,6 +106,8 @@ export function extractPackageChanges<T extends BaseLogger>(gitDiffResult: strin
 
 /**
  *  Filter packages changed to keep only the one that can't be handled automatically
+ * @param packageChanges
+ * @param conflictsIgnoredPackages
  */
 export function notIgnorablePackages(packageChanges: { file: string; oldPackages: string[]; newPackages: string[] }[], conflictsIgnoredPackages : string[]) {
   return packageChanges.reduce((remaining: { file: string; addedPackages: string[]; commonPackages: string[]; removedPackages: string[] }[], fileWithPackages) => {

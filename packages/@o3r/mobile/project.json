@@ -1,17 +1,13 @@
 {
+  "name": "mobile",
   "$schema": "https://raw.githubusercontent.com/nrwl/nx/master/packages/nx/schemas/project-schema.json",
   "projectType": "library",
-  "name": "mobile",
-  "root": "packages/@o3r/mobile",
   "sourceRoot": "packages/@o3r/mobile/src",
   "prefix": "o3r",
   "targets": {
     "build": {
       "executor": "nx:noop",
-      "dependsOn": [
-        "build-builders",
-        "compile"
-      ]
+      "dependsOn": ["build-builders", "compile"]
     },
     "compile": {
       "executor": "@angular-devkit/build-angular:ng-packagr",
@@ -22,11 +18,7 @@
     },
     "build-builders": {
       "executor": "nx:run-script",
-      "dependsOn": [
-        "^build",
-        "compile",
-        "prepare-build-builders"
-      ],
+      "dependsOn": ["^build", "compile", "prepare-build-builders"],
       "outputs": [
         "{projectRoot}/dist/pcloudy",
         "{projectRoot}/dist/schematics/**/*.js",
@@ -39,25 +31,18 @@
       }
     },
     "lint": {
-      "executor": "@nrwl/linter:eslint",
-      "configurations": {
-        "ci": {
-          "quiet": true,
-          "cacheLocation": ".cache/eslint"
-        }
-      },
       "options": {
         "eslintConfig": "packages/@o3r/mobile/.eslintrc.js",
         "lintFilePatterns": [
-          "packages/@o3r/mobile/src/**/*.ts"
+          "packages/@o3r/mobile/src/**/*.ts",
+          "packages/@o3r/mobile/package.json"
         ]
       }
     },
     "test": {
-      "executor": "@nrwl/jest:jest",
+      "executor": "@nx/jest:jest",
       "options": {
-        "jestConfig": "packages/@o3r/mobile/jest.config.js",
-        "silent": true
+        "jestConfig": "packages/@o3r/mobile/jest.config.js"
       }
     },
     "prepare-publish": {
@@ -76,6 +61,12 @@
       "executor": "nx:run-script",
       "options": {
         "script": "prepare:build:builders"
+      }
+    },
+    "documentation": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "compodoc"
       }
     }
   },

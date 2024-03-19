@@ -1,8 +1,11 @@
 {
   "extends": "../../../tsconfig.build",
   "compilerOptions": {
-    "declaration": false,
+    "skipLibCheck": true, // TODO: to remove when supported (ref: https://github.com/typescript-eslint/typescript-eslint/issues/8047)
+    "declaration": true,
     "declarationMap": false,
+    "incremental": true,
+    "composite": true,
     "lib": ["es5", "es6", "scripthost"],
     "sourceMap": false,
     "types": ["node"],

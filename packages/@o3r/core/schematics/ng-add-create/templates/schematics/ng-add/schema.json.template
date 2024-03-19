@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/schema",
+  "$schema": "http://json-schema.org/draft-07/schema",
   "$id": "ngAddSchematicsSchema",
   "title": "Add <%= featureName %> project",
   "description": "'ng add <%= featureName %>' project",
@@ -18,11 +18,10 @@
     },
     "skipInstall": {
       "type": "boolean",
-      "description": "Skip the install process",
-      "default": true
+      "description": "Skip the install process"
     }
   },
-  "additionalProperties": false,
+  "additionalProperties": true,
   "required": [
   ]
 }

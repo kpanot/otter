@@ -4,16 +4,11 @@
   "projectType": "library",
   "sourceRoot": "packages/@o3r/third-party/src",
   "prefix": "o3r",
-  "implicitDependencies": [
-    "dev-tools"
-  ],
+  "implicitDependencies": ["dev-tools"],
   "targets": {
     "build": {
       "executor": "nx:noop",
-      "dependsOn": [
-        "build-builders",
-        "compile"
-      ]
+      "dependsOn": ["build-builders", "compile"]
     },
     "compile": {
       "executor": "@angular-devkit/build-angular:ng-packagr",
@@ -23,25 +18,18 @@
       }
     },
     "lint": {
-      "executor": "@nrwl/linter:eslint",
-      "configurations": {
-        "ci": {
-          "quiet": true,
-          "cacheLocation": ".cache/eslint"
-        }
-      },
       "options": {
         "eslintConfig": "packages/@o3r/third-party/.eslintrc.js",
         "lintFilePatterns": [
-          "packages/@o3r/third-party/src/**/*.ts"
+          "packages/@o3r/third-party/src/**/*.ts",
+          "packages/@o3r/third-party/package.json"
         ]
       }
     },
     "test": {
-      "executor": "@nrwl/jest:jest",
+      "executor": "@nx/jest:jest",
       "options": {
-        "jestConfig": "packages/@o3r/third-party/jest.config.js",
-        "silent": true
+        "jestConfig": "packages/@o3r/third-party/jest.config.js"
       }
     },
     "prepare-publish": {
@@ -66,6 +54,12 @@
       "executor": "nx:run-script",
       "options": {
         "script": "build:builders"
+      }
+    },
+    "documentation": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "compodoc"
       }
     }
   },

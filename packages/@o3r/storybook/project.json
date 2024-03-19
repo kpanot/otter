@@ -7,12 +7,7 @@
   "targets": {
     "build": {
       "executor": "nx:noop",
-      "dependsOn": [
-        "build-builders",
-        "compile",
-        "build-wrapper",
-        "build-react"
-      ]
+      "dependsOn": ["build-builders", "compile", "build-wrapper", "build-react"]
     },
     "prepare-build-builders": {
       "executor": "nx:run-script",
@@ -27,7 +22,7 @@
       }
     },
     "compile": {
-      "executor": "@nrwl/js:tsc",
+      "executor": "@nx/js:tsc",
       "options": {
         "main": "packages/@o3r/storybook/src/public_api.ts",
         "tsConfig": "packages/@o3r/storybook/tsconfig.build.json",
@@ -45,59 +40,39 @@
             "output": "./component-wrapper"
           }
         ],
-        "updateBuildableProjectDepsInPackageJson": false,
         "clean": false
       },
-      "dependsOn": [
-        "^build"
-      ]
+      "dependsOn": ["^build"]
     },
     "build-wrapper": {
       "executor": "nx:run-script",
-      "outputs": [
-        "{projectRoot}/dist/component-wrapper"
-      ],
+      "outputs": ["{projectRoot}/dist/component-wrapper"],
       "options": {
         "script": "build:wrapper"
       },
-      "dependsOn": [
-        "^build",
-        "compile"
-      ]
+      "dependsOn": ["^build", "compile"]
     },
     "build-react": {
       "executor": "nx:run-script",
-      "outputs": [
-        "{projectRoot}/dist/addon"
-      ],
+      "outputs": ["{projectRoot}/dist/addon"],
       "options": {
         "script": "build:react"
       },
-      "dependsOn": [
-        "^build",
-        "compile"
-      ]
+      "dependsOn": ["^build", "compile"]
     },
     "lint": {
-      "executor": "@nrwl/linter:eslint",
-      "configurations": {
-        "ci": {
-          "quiet": true,
-          "cacheLocation": ".cache/eslint"
-        }
-      },
       "options": {
         "eslintConfig": "packages/@o3r/storybook/.eslintrc.js",
         "lintFilePatterns": [
-          "packages/@o3r/storybook/src/**/*.ts"
+          "packages/@o3r/storybook/src/**/*.ts",
+          "packages/@o3r/storybook/package.json"
         ]
       }
     },
     "test": {
-      "executor": "@nrwl/jest:jest",
+      "executor": "@nx/jest:jest",
       "options": {
-        "jestConfig": "packages/@o3r/storybook/jest.config.js",
-        "silent": true
+        "jestConfig": "packages/@o3r/storybook/jest.config.js"
       }
     },
     "prepare-publish": {
@@ -110,6 +85,12 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "npm publish packages/@o3r/storybook/dist"
+      }
+    },
+    "documentation": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "compodoc"
       }
     }
   },

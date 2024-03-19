@@ -2,7 +2,6 @@
 import { getTestBed, TestBed } from '@angular/core/testing';
 import { BrowserDynamicTestingModule, platformBrowserDynamicTesting } from '@angular/platform-browser-dynamic/testing';
 import { MockStore, provideMockStore } from '@ngrx/store/testing';
-import { mockTranslationModules } from '@o3r/testing';
 import { ConfigurationState } from '../stores';
 import { ConfigurationDevtoolsConsoleService } from './configuration-devtools.console.service';
 import { OTTER_CONFIGURATION_DEVTOOLS_DEFAULT_OPTIONS, OTTER_CONFIGURATION_DEVTOOLS_OPTIONS } from './configuration-devtools.token';
@@ -19,7 +18,6 @@ describe('Configuration DevTools console', () => {
   beforeEach(async () => {
     jest.spyOn(console, 'info').mockImplementation();
     await TestBed.configureTestingModule({
-      imports: [...mockTranslationModules()],
       providers: [
         ConfigurationDevtoolsConsoleService,
         { provide: OTTER_CONFIGURATION_DEVTOOLS_OPTIONS, useValue: OTTER_CONFIGURATION_DEVTOOLS_DEFAULT_OPTIONS },
@@ -88,7 +86,7 @@ describe('Configuration DevTools console', () => {
 
   it('should upsert new configurations', () => {
     mockStore.dispatch = jest.fn();
-    service.loadConfiguration('[{"library":"@scope/package","name":"componentTest","config":{"lolProp":123}}]');
+    service.updateConfigurations('[{"library":"@scope/package","name":"componentTest","config":{"lolProp":123}}]');
 
     expect(mockStore.dispatch).toHaveBeenCalledWith(expect.objectContaining(
       {

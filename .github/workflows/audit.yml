@@ -14,16 +14,19 @@ on:
     branches:
       - main
       - 'release/*'
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
 
 jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       - name: Setup
         uses: ./tools/github-actions/setup
-        with:
-          enable-build-cache: 'false'
       - name: Audit
         id: audit
         uses: ./tools/github-actions/audit
@@ -33,5 +36,6 @@ jobs:
           recursive: true
           environment: all
       - name: Summary
+        if: success() || failure()
         run: echo "${{ steps.audit.outputs.reportMarkdown }}" >> $GITHUB_STEP_SUMMARY
 

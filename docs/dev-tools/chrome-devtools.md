@@ -1,6 +1,6 @@
 # Otter Chrome DevTools
 
-Otter Framework is providing a Chrome DevTools extension for your applications.
+Otter Framework is providing an [Otter Chrome Extension](https://chrome.google.com/webstore/detail/otter-devtools/aejabgendbpckkdnjaphhlifbhepmbne) for your applications.
 The extension comes with the following features:
 
 - **Application information**: Application version, environment, build date, etc.
@@ -9,7 +9,24 @@ The extension comes with the following features:
 - **Rule Engine current state**: Rule engine state, rule engine logs, etc.
 - **Configuration**: display and modification of the application components configuration.
 
-## How to enable the extension support in your application
+## How to enable auto package registration
+
+The Otter module will automatically register its Devtool service if the following configuration is set in the workspace configuration:
+
+```json
+{
+  "schematics": {
+    "*:ng-add": {
+      "registerDevtool": true
+    }
+  }
+}
+```
+
+> [!NOTE]
+> This options is set by the `--with-devtool` options of the `ng add @o3r/core` command.
+
+## How to enable manually the extension support in your application
 
 Once you have download the extension, you will need to enable the features you need one by one. There is no root toggle.
 To do so, you will need to import the corresponding modules in you AppModule:
@@ -55,9 +72,8 @@ export class AppComponent {
     configurationMessageService: ConfigurationDevtoolsMessageService,
     localizationMessageService: LocalizationDevtoolsMessageService,
     rulesEngineDevtoolsMessageService: RulesEngineDevtoolsMessageService) {
-    this.getStaticConfig();
     if (environment.DEBUG_MODE) {
-      // The Otter Devtools services should be activated only in the development mode
+      // It is strongly recommended to activate the Otter Devtools services only in the development mode
       applicationDevtoolsMessageService.activate();
       componentsDevtoolsMessageService.activate();
       configurationMessageService.activate();
@@ -68,8 +84,9 @@ export class AppComponent {
 }
 ```
 
-> **Note**: The services can be also activated at bootstrap time by providing `isActivatedOnBootstrap: true` to their dedicated token `OTTER_<module>_DEVTOOLS_OPTIONS` (example: `{provide: 'OTTER_CONFIGURATION_DEVTOOLS_OPTIONS', useValue: {isActivatedOnBootstrap: true}}`).
+> [!TIP]
+> The services can be also activated at bootstrap time by providing `isActivatedOnBootstrap: true` to their dedicated token `OTTER_<module>_DEVTOOLS_OPTIONS` (example: `{provide: 'OTTER_CONFIGURATION_DEVTOOLS_OPTIONS', useValue: {isActivatedOnBootstrap: true}}`).
 
-## How to install the application
+## How to install the extension
 
-Currently the extension is available only in the **Chrome browser**. You can download it from the [Google Web Store](https://chrome.google.com/webstore/detail/otter-devtools/aejabgendbpckkdnjaphhlifbhepmbne).
+You can find the **Otter Devtools** on the Chrome Store by clicking on [this link](https://chrome.google.com/webstore/detail/otter-devtools/aejabgendbpckkdnjaphhlifbhepmbne) or searching for `Otter Devtools` on the [Chrome Web Store](https://chrome.google.com/webstore).

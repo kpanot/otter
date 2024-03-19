@@ -1,48 +1,65 @@
-import { apply, chain, MergeStrategy, mergeWith, renameTemplateFiles, Rule, SchematicContext, template, Tree, UpdateRecorder, url } from '@angular-devkit/schematics';
-import { addSymbolToNgModuleMetadata, insertImport, isImported } from '@schematics/angular/utility/ast-utils';
-
-import { getFileInfo, getTemplateFolder, ngAddPackages } from '@o3r/schematics';
-import { InsertChange } from '@schematics/angular/utility/change';
+import {
+  apply,
+  chain,
+  MergeStrategy,
+  mergeWith,
+  move,
+  renameTemplateFiles,
+  Rule,
+  SchematicContext,
+  template,
+  Tree,
+  UpdateRecorder,
+  url
+} from '@angular-devkit/schematics';
+import {
+  getFileInfo, getTemplateFolder, getWorkspaceConfig, ngAddPackages, insertBeforeModule as o3rInsertBeforeModule,
+  insertImportToModuleFile as o3rInsertImportToModuleFile
+} from '@o3r/schematics';
+import { addRootImport, addRootProvider } from '@schematics/angular/utility';
+import { isImported } from '@schematics/angular/utility/ast-utils';
+import { NodeDependencyType } from '@schematics/angular/utility/dependencies';
+import { posix } from 'node:path';
 
 /**
  * Enable customization capabilities
- *
  * @param rootPath @see RuleFactory.rootPath
  * @param o3rCoreVersion
- * @param _options
+ * @param options
+ * @param options.projectName
+ * @param isLibrary
  */
-export function updateCustomizationEnvironment(rootPath: string, o3rCoreVersion?: string, _options?: { projectName: string | null }): Rule {
+export function updateCustomizationEnvironment(rootPath: string, o3rCoreVersion?: string, options?: { projectName?: string | undefined }, isLibrary?: boolean): Rule {
   /**
    * Generate customization folder
-   *
    * @param tree
    * @param context
    */
   const generateC11nFolder = (tree: Tree, context: SchematicContext) => {
-
-    if (tree.exists('src/customization/presenters-map.empty.ts')) {
+    const workingDirectory = options?.projectName && getWorkspaceConfig(tree)?.projects[options.projectName]?.root || '.';
+    if (tree.exists(posix.join(workingDirectory, 'src', 'customization', 'presenters-map.empty.ts'))) {
       return tree;
     }
     const templateSource = apply(
       url(getTemplateFolder(rootPath, __dirname)),
       [
         template({}),
-        renameTemplateFiles()
+        renameTemplateFiles(),
+        move(workingDirectory)
       ]
     );
 
-    const rule = mergeWith(templateSource, MergeStrategy.Default);
-    return rule(tree, context);
+    return mergeWith(templateSource, MergeStrategy.Default)(tree, context);
   };
 
   /**
    * Edit main module with the customization required information
-   *
    * @param tree
    * @param context
    */
   const registerModules: Rule = (tree: Tree, context: SchematicContext) => {
-    const fileInfo = getFileInfo(tree, context);
+    const additionalRules: Rule[] = [];
+    const fileInfo = getFileInfo(tree, context, options?.projectName);
     if (!fileInfo.moduleFilePath || !fileInfo.appModuleFile || !fileInfo.sourceFile) {
       return tree;
     }
@@ -52,56 +69,26 @@ export function updateCustomizationEnvironment(rootPath: string, o3rCoreVersion?
       return tree;
     }
 
+    const fileContent = tree.readText(fileInfo.moduleFilePath).replace(/[\r\n ]*/g, '');
     const recorder = tree.beginUpdate(fileInfo.moduleFilePath);
-    const moduleIndex = fileInfo.ngModulesMetadata && fileInfo.ngModulesMetadata[0] ?
-      fileInfo.ngModulesMetadata[0].pos - ('NgModule'.length + 1) : fileInfo.appModuleFile.indexOf('@NgModule');
+    const moduleIndex = fileInfo.moduleIndex;
 
     /**
      * Insert import on top of the main module file
-     *
      * @param rec
      * @param name
      * @param file
      * @param isDefault
      */
-    const insertImportToModuleFile = (rec: UpdateRecorder, name: string, file: string, isDefault?: boolean) => {
-      const importChange = insertImport(fileInfo.sourceFile!, fileInfo.moduleFilePath!, name, file, isDefault);
-      if (importChange instanceof InsertChange) {
-        return rec.insertLeft(importChange.pos, importChange.toAdd);
-      }
-      return rec;
-    };
-
-    /**
-     * Add elements in the metadata of the ngModule (entryComponents, imports etc.)
-     *
-     * @param rec
-     * @param metadataField
-     * @param name
-     */
-    const addToNgModuleMetadata = (rec: UpdateRecorder, metadataField: string, name: string) => {
-      addSymbolToNgModuleMetadata(fileInfo.sourceFile!, fileInfo.moduleFilePath!, metadataField, name)
-        .forEach((change) => {
-          if (change instanceof InsertChange) {
-            rec = rec.insertLeft(change.pos, change.toAdd);
-          }});
-      return rec;
-    };
+    const insertImportToModuleFile = (rec: UpdateRecorder, name: string, file: string, isDefault?: boolean) =>
+      o3rInsertImportToModuleFile(name, file, fileInfo.sourceFile!, rec, fileInfo.moduleFilePath!, isDefault);
 
     /**
      * Add custom code before the module definition
-     *
      * @param rec
      * @param line
      */
-    const insertBeforeModule = (rec: UpdateRecorder, line: string) => {
-      const buffer = tree.read(fileInfo.moduleFilePath!);
-      const content = buffer ? buffer.toString().replace(/[\r\n ]*/g, '') : '';
-      if (content.indexOf(line.replace(/[\r\n ]*/g, '')) === -1) {
-        return rec.insertLeft(moduleIndex - 1, `${line}\n\n`);
-      }
-      return rec;
-    };
+    const insertBeforeModule = (rec: UpdateRecorder, line: string) => o3rInsertBeforeModule(line, fileContent, rec, moduleIndex);
 
     let updatedRecorder = recorder;
 
@@ -110,10 +97,9 @@ export function updateCustomizationEnvironment(rootPath: string, o3rCoreVersion?
     updatedRecorder = insertImportToModuleFile(updatedRecorder, 'Provider', '@angular/core');
     updatedRecorder = insertImportToModuleFile(updatedRecorder, 'initializeCustomProviders', '../customization/custom-providers.empty');
 
-    updatedRecorder = addToNgModuleMetadata(updatedRecorder, 'imports', '...entry.customComponentsModules');
-    updatedRecorder = addToNgModuleMetadata(updatedRecorder, 'entryComponents', '...entry.customComponents');
-    updatedRecorder = addToNgModuleMetadata(updatedRecorder, 'providers', '...customProviders');
-    updatedRecorder = addToNgModuleMetadata(updatedRecorder, 'imports', 'C11nModule.forRoot({registerCompFunc: registerCustomComponents})');
+    additionalRules.push(addRootImport(options?.projectName!, ({code}) => code`...entry.customComponentsModules`));
+    additionalRules.push(addRootProvider(options?.projectName!, ({code}) => code`...customProviders`));
+    additionalRules.push(addRootImport(options?.projectName!, ({code}) => code`C11nModule.forRoot({registerCompFunc: registerCustomComponents})`));
     updatedRecorder = insertImportToModuleFile(updatedRecorder, 'C11nModule', '@o3r/components');
 
     updatedRecorder = insertBeforeModule(updatedRecorder, 'const entry = initializeEntryComponents();');
@@ -122,12 +108,23 @@ export function updateCustomizationEnvironment(rootPath: string, o3rCoreVersion?
 
     tree.commitUpdate(updatedRecorder);
 
-    return tree;
+    return chain(additionalRules)(tree, context);
   };
 
-  return chain([
-    generateC11nFolder,
-    registerModules,
-    ngAddPackages(['@o3r/components', '@o3r/configuration'], {skipConfirmation: true, version: o3rCoreVersion, parentPackageInfo: '@o3r/core - customization environment update'})
-  ]);
+  return (tree, _context) => {
+    const workingDirectory = options?.projectName && getWorkspaceConfig(tree)?.projects[options.projectName]?.root || '.';
+
+    return chain([
+      generateC11nFolder,
+      registerModules,
+      ngAddPackages(['@o3r/components', '@o3r/configuration'], {
+        skipConfirmation: true,
+        version: o3rCoreVersion,
+        parentPackageInfo: '@o3r/core - customization environment update',
+        projectName: options?.projectName,
+        dependencyType: isLibrary ? NodeDependencyType.Peer : NodeDependencyType.Default,
+        workingDirectory
+      })
+    ]);
+  };
 }

@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/schema",
+  "$schema": "http://json-schema.org/draft-07/schema",
   "type": "object",
   "$id": "StyleExtractorBuilderSchema",
   "title": "Style builder",
@@ -12,6 +12,10 @@
         "type": "string"
       },
       "default": ["src/**/*.style.scss"]
+    },
+    "name": {
+      "type": "string",
+      "description": "Library/Application name to be assigned into metadata"
     },
     "outputFile": {
       "type": "string",
@@ -35,6 +39,16 @@
       "type": "boolean",
       "description": "Write metadata inline",
       "default": false
+    },
+    "ignoreDuplicateWarning": {
+      "type": "boolean",
+      "description": "Will not display warning for duplicated variable",
+      "default": false
+    },
+    "ignoreInvalidValue": {
+      "type": "boolean",
+      "description": "Will display only a warning for invalid value",
+      "default": true
     }
   },
   "additionalProperties": false,

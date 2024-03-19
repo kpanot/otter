@@ -18,12 +18,11 @@ export class RulesetHistoryService {
    */
   public readonly rulesetExecutions$: Observable<RulesetExecutionDebug[]> = this.ruleEngineDebugEvents$.pipe(
     map(({events, rulesetMap}) => rulesetReportToHistory(events, rulesetMap)),
-    shareReplay(1)
+    shareReplay({bufferSize: 1, refCount: true})
   );
 
   /**
    * Update the ruleset history
-   *
    * @param message Message from the background service
    */
   public update(message: RulesEngineDebugEventsContentMessage) {

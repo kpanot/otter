@@ -15,7 +15,7 @@ let packageJsonPath: string | undefined;
 
 program
   .arguments('[package.json file]')
-  .description('Edit package.json to export the files')
+  .description('[DEPRECATED] Edit package.json to export the files')
   .option('-i, --ignore <pattern>', 'An array of glob patterns to exclude matches', collect, [])
   .option('-S, --source-folder <path>', 'Source folder', 'src/')
   .option('--verbose', 'Display debug log message')
@@ -35,6 +35,7 @@ const logger = winston.createLogger({
   ),
   transports: new winston.transports.Console()
 });
+logger.warn('This script is deprecated, will be removed in Otter v12.');
 
 let files: string[] = [];
 files.push(
@@ -63,7 +64,7 @@ files.push(
 
 // remove duplicate RegExps
 files = files.reduce((acc, file) => {
-  const reg = new RegExp('^' + file.replace(/\./ig, '\\.').replace(/\*/ig, '[^\\/]*') + '$');
+  const reg = new RegExp('^' + file.replace(/\\*\./ig, '\\.').replace(/\\*\*/ig, '[^\\/]*') + '$');
   return acc.filter((f) => f === file || !reg.test(f));
 }, [...files]);
 

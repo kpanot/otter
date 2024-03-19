@@ -1,63 +1,64 @@
+import { apply, chain, MergeStrategy, mergeWith, move, noop, Rule, SchematicContext, template, Tree, url } from '@angular-devkit/schematics';
 import {
-  apply,
-  chain,
-  MergeStrategy,
-  mergeWith,
-  Rule,
-  SchematicContext,
-  template,
-  Tree,
-  url
-} from '@angular-devkit/schematics';
-import {
-  findFirstNodeOfKind, getAppModuleFilePath, getDefaultProjectName, getExternalDependenciesVersionRange, getNodeDependencyList,
-  getProjectFromTree, getTemplateFolder, ignorePatterns, readAngularJson, readPackageJson, writeAngularJson
+  createSchematicWithMetricsIfInstalled,
+  type DependencyToAdd,
+  findFirstNodeOfKind,
+  getAppModuleFilePath,
+  getModuleIndex,
+  getPackageManagerRunner,
+  getProjectNewDependenciesTypes,
+  getTemplateFolder,
+  getWorkspaceConfig,
+  ignorePatterns,
+  insertBeforeModule as o3rInsertBeforeModule,
+  insertImportToModuleFile as o3rInsertImportToModuleFile,
+  readPackageJson,
+  setupDependencies,
+  writeAngularJson
 } from '@o3r/schematics';
-import * as ts from '@schematics/angular/third_party/github.com/Microsoft/TypeScript/lib/typescript';
 import {
-  addImportToModule,
-  addProviderToModule,
-  getDecoratorMetadata,
   insertImport,
   isImported
 } from '@schematics/angular/utility/ast-utils';
+import { addRootImport, addRootProvider } from '@schematics/angular/utility';
 import { InsertChange } from '@schematics/angular/utility/change';
-import { addPackageJsonDependency, NodeDependency, NodeDependencyType } from '@schematics/angular/utility/dependencies';
 import * as path from 'node:path';
+import * as fs from 'node:fs';
+import * as ts from 'typescript';
+import type { PackageJson } from 'type-fest';
 
 const packageJsonPath = path.resolve(__dirname, '..', '..', 'package.json');
-const ngxTranslateCoreDep = '@ngx-translate/core';
-const intlMessageFormatDep = 'intl-messageformat';
-const formatjsIntlNumberformatDep = '@formatjs/intl-numberformat';
-const angularCdkDep = '@angular/cdk';
+const ownPackageJson = JSON.parse(fs.readFileSync(packageJsonPath, { encoding: 'utf-8' })) as PackageJson;
 
 /**
  * Add Otter localization support
- *
  * @param options @see RuleFactory.options
  * @param options.projectName
  * @param rootPath @see RuleFactory.rootPath
  */
-export function updateLocalization(options: { projectName: string | null }, rootPath: string): Rule {
-
+export function updateLocalization(options: { projectName?: string | null | undefined }, rootPath: string): Rule {
+  if (!options.projectName) {
+    return noop;
+  }
   const mainAssetsFolder = 'src/assets';
   const devResourcesFolder = 'dev-resources';
 
   /**
    * Generate locales folder
-   *
    * @param tree
    * @param context
    */
   const generateLocalesFolder = (tree: Tree, context: SchematicContext) => {
+    const workingDirectory = (options.projectName && getWorkspaceConfig(tree)?.projects[options.projectName]?.root) || '.';
 
     let gitIgnoreContent = '';
-    if (tree.exists('.gitignore')) {
-      gitIgnoreContent = tree.read('.gitignore')!.toString();
+    const gitIgnorePath = path.posix.join(workingDirectory, '.gitignore');
+    if (tree.exists(gitIgnorePath)) {
+      gitIgnoreContent = tree.read(gitIgnorePath)!.toString();
       if (gitIgnoreContent.indexOf('/*.metadata.json')) {
         return tree;
       }
-      tree.delete('.gitignore');
+      tree.delete(gitIgnorePath);
     }
 
     const templateSource = apply(url(getTemplateFolder(rootPath, __dirname)), [
@@ -66,7 +67,8 @@ export function updateLocalization(options: { projectName: string | null }, root
         devResourcesFolder,
         gitIgnoreContent,
         mainAssetsFolder
-      })
+      }),
+      move(workingDirectory)
     ]);
 
     const rule = mergeWith(templateSource, MergeStrategy.Overwrite);
@@ -75,16 +77,17 @@ export function updateLocalization(options: { projectName: string | null }, root
 
   /**
    * Add translation generation builders into angular.json
-   *
    * @param tree
    * @param context
    */
   const updateAngularJson: Rule = (tree: Tree, context: SchematicContext) => {
-    const workspace = readAngularJson(tree);
-    const projectName = options.projectName || workspace.defaultProject || Object.keys(workspace.projects)[0];
-    const workspaceProject = getProjectFromTree(tree, projectName);
+    const workspace = getWorkspaceConfig(tree);
+    const projectName = options.projectName;
+    const workspaceProject = options.projectName ? workspace?.projects[options.projectName] : undefined;
+    const projectRoot = path.posix.join(workspaceProject?.root || '');
     const distFolder: string =
       (
+        workspaceProject &&
         workspaceProject.architect &&
         workspaceProject.architect.build &&
         workspaceProject.architect.build.options &&
@@ -95,8 +98,8 @@ export function updateLocalization(options: { projectName: string | null }, root
       ) || './dist';
 
     // exit if not an application
-    if (workspaceProject.projectType !== 'application') {
-      context.logger.debug('Add translation extraction only on application project');
+    if (!workspace || !projectName || !workspaceProject) {
+      context.logger.debug('No application project found to add translation extraction');
       return tree;
     }
 
@@ -121,6 +124,38 @@ export function updateLocalization(options: { projectName: string | null }, root
         }
       }
     };
+
+    const pathTsconfigCms = path.posix.join(projectRoot, 'tsconfig.cms.json');
+    workspaceProject.architect['extract-translations'] ||= {
+      builder: '@o3r/localization:extractor',
+      options: {
+        tsConfig: pathTsconfigCms.replace(/^\//, ''),
+        libraries: []
+      }
+    };
+
+    if (!tree.exists(pathTsconfigCms)) {
+      const tsconfigCms = {
+        extends: `./${tree.exists(path.posix.join(projectRoot, 'tsconfig.build.json')) ? 'tsconfig.build' : 'tsconfig.json'}`,
+        include: [
+          'src/**/*.component.ts',
+          'src/**/*.config.ts',
+          'src/**/*.module.ts'
+        ]
+      };
+      tree.create(pathTsconfigCms, JSON.stringify(tsconfigCms, null, 2));
+    } else {
+      const localizationSourceRegExps = ['src/**/*.component.ts'];
+      const tsconfigCms = tree.readJson(pathTsconfigCms) as Record<string, any>;
+      if (!Array.isArray(tsconfigCms.include) || !localizationSourceRegExps.some((r) => tsconfigCms.include.includes(r))) {
+        tsconfigCms.include ||= [];
+        tsconfigCms.include.push(
+          ...localizationSourceRegExps
+            .filter((r) => !tsconfigCms.include.includes(r))
+        );
+        tree.overwrite(pathTsconfigCms, JSON.stringify(tsconfigCms, null, 2));
+      }
+    }
 
     if (workspaceProject.architect.build) {
       const alreadyExistingBuildOption =
@@ -170,21 +205,20 @@ export function updateLocalization(options: { projectName: string | null }, root
 
   /**
    * Changed package.json start script to run localization generation
-   *
    * @param tree
    * @param context
    */
   const updatePackageJson: Rule = (tree: Tree, context: SchematicContext) => {
-    const workspace = readAngularJson(tree);
-    const projectName = options.projectName || workspace.defaultProject || Object.keys(workspace.projects)[0];
-    const workspaceProject = getProjectFromTree(tree, projectName || undefined);
-    const packageJson = readPackageJson(tree, workspaceProject);
-
-    // exit if not an application
-    if (workspaceProject.projectType !== 'application') {
-      context.logger.debug('Add translation extraction scripts only on application project');
+    const workspace = getWorkspaceConfig(tree);
+    const projectName = options.projectName;
+    const workspaceProject = options.projectName ? workspace?.projects[options.projectName] : undefined;
+    const packageManagerRunner = getPackageManagerRunner(getWorkspaceConfig(tree));
+    if (!projectName || !workspace || !workspaceProject) {
+      context.logger.debug('No application project found to add translation extraction');
       return tree;
     }
+
+    const packageJson = readPackageJson(tree, workspaceProject);
 
     packageJson.scripts = packageJson.scripts || {};
     if (packageJson.scripts && packageJson.scripts.start && packageJson.scripts.start !== `ng run ${projectName}:run`) {
@@ -195,7 +229,7 @@ export function updateLocalization(options: { projectName: string | null }, root
     }
     packageJson.scripts.start ||= `ng run ${projectName}:run`;
     if (packageJson.scripts.build?.indexOf('generate:translations') === -1) {
-      packageJson.scripts.build = `yarn generate:translations && ${packageJson.scripts.build}`;
+      packageJson.scripts.build = `${packageManagerRunner} generate:translations && ${packageJson.scripts.build}`;
     }
     packageJson.scripts['generate:translations:dev'] ||= `ng run ${projectName}:generate-translations`;
     packageJson.scripts['generate:translations'] ||= `ng run ${projectName}:generate-translations:production`;
@@ -205,12 +239,12 @@ export function updateLocalization(options: { projectName: string | null }, root
 
   /**
    * Edit main module with the translation required configuration
-   *
    * @param tree
    * @param context
    */
   const registerModules: Rule = (tree: Tree, context: SchematicContext) => {
-    const moduleFilePath = getAppModuleFilePath(tree, context);
+    const additionalRules: Rule[] = [];
+    const moduleFilePath = getAppModuleFilePath(tree, context, options.projectName);
     if (!moduleFilePath) {
       return tree;
     }
@@ -228,72 +262,22 @@ export function updateLocalization(options: { projectName: string | null }, root
     }
 
     const recorder = tree.beginUpdate(moduleFilePath);
-    const ngModulesMetadata = getDecoratorMetadata(sourceFile, 'NgModule', '@angular/core');
     const appModuleFile = tree.read(moduleFilePath)!.toString();
-    const moduleIndex = ngModulesMetadata[0] ? ngModulesMetadata[0].pos - ('NgModule'.length + 1) : appModuleFile.indexOf('@NgModule');
+    const { moduleIndex } = getModuleIndex(sourceFile, appModuleFile);
 
-    /**
-     * Insert import on top of the main module file
-     *
-     * @param name
-     * @param file
-     * @param isDefault
-     */
-    const insertImportToModuleFile = (name: string, file: string, isDefault?: boolean) => {
-      const importChange = insertImport(sourceFile, moduleFilePath, name, file, isDefault);
-      if (importChange instanceof InsertChange) {
-        recorder.insertLeft(importChange.pos, importChange.toAdd);
-      }
-    };
+    const addImportToModuleFile = (name: string, file: string, moduleFunction?: string) => additionalRules.push(
+      addRootImport(options.projectName!, ({code, external}) => code`${external(name, file)}${moduleFunction}`)
+    );
 
-    /**
-     * Add import to the main module
-     *
-     * @param name
-     * @param file
-     * @param moduleFunction
-     */
-    const addImportToModuleFile = (name: string, file: string, moduleFunction?: string) => {
-      if (new RegExp(name).test(appModuleFile.substring(moduleIndex))) {
-        context.logger.warn(`Skipped ${name} (already imported)`);
-        return;
-      }
-      addImportToModule(sourceFile, moduleFilePath, name, file)
-        .forEach((change) => {
-          if (change instanceof InsertChange) {
-            recorder.insertLeft(change.pos, moduleFunction && change.pos > moduleIndex ? change.toAdd.replace(name, name + moduleFunction) : change.toAdd);
-          }
-        });
-    };
+    const insertImportToModuleFile = (name: string, file: string, isDefault?: boolean) =>
+      o3rInsertImportToModuleFile(name, file, sourceFile, recorder, moduleFilePath, isDefault);
 
-    /**
-     * Add providers to the main module
-     *
-     * @param name
-     * @param file
-     * @param customProvider
-     */
-    const addProviderToModuleFile = (name: string, file: string, customProvider?: string) => {
-      if (new RegExp(name).test(appModuleFile.substring(moduleIndex))) {
-        context.logger.warn(`Skipped ${name} (already provided)`);
-        return;
-      }
-      addProviderToModule(sourceFile, moduleFilePath, name, file)
-        .forEach((change) => {
-          if (change instanceof InsertChange) {
-            recorder.insertLeft(change.pos, customProvider && change.pos > moduleIndex ? change.toAdd.replace(name, customProvider) : change.toAdd);
-          }
-        });
-    };
+    const addProviderToModuleFile = (name: string, file: string, customProvider: string) => additionalRules.push(
+      addRootProvider(options.projectName!, ({code, external}) =>
+        code`{provide: ${external(name, file)}, ${customProvider}}`)
+    );
 
-    /**
-     * Add custom code before the module definition
-     *
-     * @param line
-     */
-    const insertBeforeModule = (line: string) => {
-      recorder.insertLeft(moduleIndex - 1, `${line}\n\n`);
-    };
+    const insertBeforeModule = (line: string) => o3rInsertBeforeModule(line, appModuleFile, recorder, moduleIndex);
 
     addImportToModuleFile(
       'TranslateModule',
@@ -330,22 +314,24 @@ export function updateLocalization(options: { projectName: string | null }, root
   };
 }`);
 
-    addProviderToModuleFile('MESSAGE_FORMAT_CONFIG', '@o3r/localization', '{provide: MESSAGE_FORMAT_CONFIG, useValue: {}}');
+    addProviderToModuleFile('MESSAGE_FORMAT_CONFIG', '@o3r/localization', 'useValue: {}');
 
     tree.commitUpdate(recorder);
+    if (!isImported(sourceFile, 'environment', '../environments/environment')) {
+      insertImportToModuleFile('environment', '../environments/environment');
+    }
 
-    return tree;
+    return chain(additionalRules)(tree, context);
   };
 
   /**
    * Set language as default on application bootstrap
-   *
    * @param tree
    * @param context
    */
   const setDefaultLanguage: Rule = (tree: Tree, context: SchematicContext) => {
-    const moduleFilePath = getAppModuleFilePath(tree, context);
-    const componentFilePath = moduleFilePath && moduleFilePath.replace(/\.module\.ts$/i, '.component.ts');
+    const moduleFilePath = getAppModuleFilePath(tree, context, options.projectName);
+    const componentFilePath = moduleFilePath && moduleFilePath.replace(/\.(?:module|config)\.ts$/i, '.component.ts');
 
     if (!(componentFilePath && tree.exists(componentFilePath))) {
       context.logger.warn(`File ${componentFilePath!} not found, the default language won't be set`);
@@ -401,13 +387,12 @@ export function updateLocalization(options: { projectName: string | null }, root
 
   /**
    * Add mockTranslationModule to application tests.
-   *
    * @param tree
    * @param context
    */
   const addMockTranslationModule: Rule = (tree: Tree, context: SchematicContext) => {
-    const moduleFilePath = getAppModuleFilePath(tree, context);
-    const componentSpecFilePath = moduleFilePath && moduleFilePath.replace(/\.module\.ts$/i, '.component.spec.ts');
+    const moduleFilePath = getAppModuleFilePath(tree, context, options.projectName);
+    const componentSpecFilePath = moduleFilePath && moduleFilePath.replace(/\.(?:module|config)\.ts$/i, '.component.spec.ts');
 
     if (!(componentSpecFilePath && tree.exists(componentSpecFilePath))) {
       return tree;
@@ -451,37 +436,38 @@ export function updateLocalization(options: { projectName: string | null }, root
 
   /**
    * Add location required dependencies
-   *
    * @param tree
-   * @param _context
    */
-  const addDependencies: Rule = (tree: Tree, context: SchematicContext) => {
-    const workspaceProject = getProjectFromTree(tree);
-    const type: NodeDependencyType = workspaceProject.projectType === 'application' ? NodeDependencyType.Default : NodeDependencyType.Peer;
-    const generatorDependencies = [ngxTranslateCoreDep, intlMessageFormatDep, formatjsIntlNumberformatDep, angularCdkDep];
-
-    try {
-      const depsRecord = getExternalDependenciesVersionRange(generatorDependencies, packageJsonPath);
-      const dependencies: NodeDependency[] = getNodeDependencyList(depsRecord, type);
-      dependencies.forEach((dep) => addPackageJsonDependency(tree, dep));
-    } catch (e: any) {
-      context.logger.warn(`Could not find generatorDependencies ${generatorDependencies.join(', ')} in file ${packageJsonPath}`);
-    }
-
-    return tree;
+  const addDependencies: Rule = (tree: Tree) => {
+    const workspaceProject = options.projectName ? getWorkspaceConfig(tree)?.projects[options.projectName] : undefined;
+    const types = getProjectNewDependenciesTypes(workspaceProject);
+    const generatorDependencies = ['@ngx-translate/core', 'intl-messageformat', '@formatjs/intl-numberformat', '@angular/cdk'];
+    const dependencies = generatorDependencies.reduce((acc, dep) => {
+      acc[dep] = {
+        inManifest: [{
+          range: ownPackageJson.peerDependencies![dep],
+          types
+        }]
+      };
+      return acc;
+    }, {} as Record<string, DependencyToAdd>);
+    return setupDependencies({
+      projectName: options.projectName || undefined,
+      dependencies
+    });
   };
 
   // Ignore generated CMS metadata
   const ignoreDevResourcesFiles = (tree: Tree, _context: SchematicContext) => {
-    return ignorePatterns(tree, [{ description: 'Local Development resources files', patterns: ['/dev-resources'] }]);
+    return ignorePatterns(tree, [{description: 'Local Development resources files', patterns: ['/dev-resources']}]);
   };
 
   return chain([
+    registerModules,
     generateLocalesFolder,
     updateAngularJson,
     updatePackageJson,
     addDependencies,
-    registerModules,
     setDefaultLanguage,
     addMockTranslationModule,
     ignoreDevResourcesFiles
@@ -490,18 +476,24 @@ export function updateLocalization(options: { projectName: string | null }, root
 
 /**
  *
+ * @param options
+ * @param options.projectName
  */
-export function updateI18n(): Rule {
-
+function updateI18nFn(options: {projectName?: string | undefined}): Rule {
+  if (!options.projectName) {
+    return noop;
+  }
   /**
    * Add i18n generation builders into angular.json
-   *
    * @param tree
    */
   const updateAngularJson: Rule = (tree: Tree) => {
-    const workspace = readAngularJson(tree);
-    const projectName = getDefaultProjectName(tree);
-    const workspaceProject = getProjectFromTree(tree, projectName);
+    const workspace = getWorkspaceConfig(tree);
+    const workspaceProject = options.projectName ? workspace?.projects[options.projectName] : undefined;
+
+    if (!workspace || !workspaceProject) {
+      return tree;
+    }
 
     if (!workspaceProject.architect) {
       workspaceProject.architect = {};
@@ -520,7 +512,7 @@ export function updateI18n(): Rule {
       };
     }
 
-    workspace.projects[projectName] = workspaceProject;
+    workspace.projects[options.projectName!] = workspaceProject;
     return writeAngularJson(tree, workspace);
   };
 
@@ -528,3 +520,5 @@ export function updateI18n(): Rule {
     updateAngularJson
   ]);
 }
+
+export const updateI18n = createSchematicWithMetricsIfInstalled(updateI18nFn);

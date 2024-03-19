@@ -3,7 +3,7 @@
 Otter Framework exposes functions to the browser console to help to debug and configure your application.
 All the helpers are exposed under the variable **_OTTER_DEVTOOLS_** accessible via `window._OTTER_DEVTOOLS_`.
 
-Currently the following modules expose helpers in the console:
+Currently, the following modules expose helpers in the console:
 
 - **Configuration**: displays and updates the application configuration
 - **Localization**: toggles localization key visualization
@@ -64,7 +64,8 @@ export class AppComponent {
 }
 ```
 
-> **Note**: The services can be also activated at bootstrap time by providing `isActivatedOnBootstrap: true` to their dedicated token `OTTER_<module>_DEVTOOLS_OPTIONS` (example: `{provide: 'OTTER_CONFIGURATION_DEVTOOLS_OPTIONS', useValue: {isActivatedOnBootstrap: true}}`).
+> [!TIP]
+> The services can be also activated at bootstrap time by providing `isActivatedOnBootstrap: true` to their dedicated token `OTTER_<module>_DEVTOOLS_OPTIONS` (example: `{provide: 'OTTER_CONFIGURATION_DEVTOOLS_OPTIONS', useValue: {isActivatedOnBootstrap: true}}`).
 
 ## How to use it
 

@@ -3,7 +3,6 @@ import {Encoder} from './encoder';
 
 /**
  * Encode a Unicode string in base64
- *
  * @param str String to convert
  */
 function base64EncodeUnicode(str: string) {
@@ -20,7 +19,6 @@ function base64EncodeUnicode(str: string) {
 
 /**
  * Decode a Unicode string from base64
- *
  * @param str String to convert
  */
 function base64DecodeUnicode(str: string) {
@@ -34,7 +32,6 @@ function base64DecodeUnicode(str: string) {
  * Make a Base64 encoded string URL friendly,
  * i.e. '+' and '/' are replaced with '-' and '_' also any trailing '='
  * characters are removed
- *
  * @param str the encoded string
  */
 export function base64EncodeUrl(str: string) {
@@ -44,7 +41,6 @@ export function base64EncodeUrl(str: string) {
 /**
  * Recreate a Base64 encoded string that was made URL friendly
  * '-' and '_' are replaced with '+' and '/' and also it is padded with '='
- *
  * @param str the encoded string
  */
 export function base64DecodeUrl(str: string) {
@@ -140,7 +136,6 @@ export function createJwtEncoder() {
 /**
  * Creates a JSON Web Encryption token Encoder which from the provided key id,
  * payload and the public properties returns a token as a JWE Compact Serialization format https://datatracker.ietf.org/doc/html/rfc7516#section-3.1
- *
  * @param aesTagLengthInBits The AES tag length, in bits.
  * @param useHeaderAsAAD Whether or not the JWE's header should be used as Additional Authenticated Data to guarantee it has not been altered at decryption
  */
@@ -148,8 +143,8 @@ export function createJweEncoder(aesTagLengthInBits = 128, useHeaderAsAAD = fals
   const base64Encoder = createBase64UrlEncoder();
   const stringEncoder = typeof window.TextEncoder !== 'undefined' ? new TextEncoder() : new Encoder();
 
-  return async ({publicKey, keyId}: {publicKey: Promise<CryptoKey> | CryptoKey; keyId: string}, jwePayload: Record<string, unknown>, publicProperties: string[]) => {
-    const jweHeader = {
+  return async ({ publicKey, keyId }: { publicKey: Promise<CryptoKey> | CryptoKey; keyId: string }, jwePayload: Record<string, unknown>, publicProperties: string[]) => {
+    const jweHeader: Record<string, unknown> = {
       alg: 'RSA-OAEP-256',
       enc: 'A256GCM',
       typ: 'JWE',

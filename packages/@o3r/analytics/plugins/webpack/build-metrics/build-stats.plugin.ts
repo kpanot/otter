@@ -1,7 +1,6 @@
 import * as os from 'node:os';
 import {Compilation, Compiler, JavascriptModulesPlugin, NormalModule, Parser, WebpackPluginInstance } from 'webpack';
 import type { ReportData, Reporter, Timing } from './reporters.interface';
-import { ConsoleLogger } from '@o3r/logger';
 import { randomUUID } from 'node:crypto';
 
 
@@ -22,11 +21,13 @@ export interface BuildStatsPluginOptions {
 const defaultOptions: BuildStatsPluginOptions = {
   threshold: 50,
   appName: 'Test',
-  reporters: [ new ConsoleLogger() ],
+  reporters: [ console ],
   sessionId: randomUUID()
 };
 
 const PLUGIN_NAME = 'OtterBuildStatsPlugin';
+
+type AvailableHooks = 'resolver' | 'resolveOptions';
 
 export class BuildStatsPlugin implements WebpackPluginInstance {
   private readonly options: BuildStatsPluginOptions;
@@ -36,7 +37,7 @@ export class BuildStatsPlugin implements WebpackPluginInstance {
 
   constructor(options?: BuildStatsPluginOptions) {
     this.options = { ...defaultOptions, ...options };
-    this.options.reporters.forEach((reporter) => reporter.identify(this.options.sessionId));
+    this.options.reporters.forEach((reporter) => reporter.debug?.(`Session ID: ${this.options.sessionId}`));
   }
 
   private bindCompilerCallbacks(compiler: Compiler) {
@@ -45,9 +46,9 @@ export class BuildStatsPlugin implements WebpackPluginInstance {
       .forEach(([hookName, hook]) => hook.intercept(this.makeInterceptorFor('Compiler')(hookName)));
 
     Object.entries(compiler.resolverFactory.hooks)
-      .filter(([hookName]) => !!compiler.resolverFactory.hooks[hookName])
-      .map(([hookName]) => [hookName, compiler.resolverFactory.hooks[hookName]])
-      .forEach(([hookName, hook]) => hook.intercept(this.makeInterceptorFor('Compiler')(hookName)));
+      .filter(([hookName]) => !!compiler.resolverFactory.hooks[hookName as AvailableHooks])
+      .map(([hookName]) => [hookName, compiler.resolverFactory.hooks[hookName as AvailableHooks]])
+      .forEach(([hookName, hook]) => typeof hook !== 'string' && hook.intercept(this.makeInterceptorFor('Compiler')(hookName as AvailableHooks) as any));
 
     compiler.hooks.compilation.tap(
       PLUGIN_NAME,
@@ -178,7 +179,7 @@ export class BuildStatsPlugin implements WebpackPluginInstance {
   private makeNewProfiledTapFn(hook: string, { name, type, fn }: { name: string; type: string; fn: Function }) {
 
     switch (type) {
-      case 'promise':
+      case 'promise': {
         return (...args: any) => {
           this.recordPluginStart(name, hook);
           const promise = (fn(...args));
@@ -186,7 +187,8 @@ export class BuildStatsPlugin implements WebpackPluginInstance {
             this.recordPluginEnd(name, hook);
           });
         };
-      case 'async':
+      }
+      case 'async': {
         return (...args: any) => {
           this.recordPluginStart(name, hook);
           const callback = args.pop();
@@ -195,7 +197,8 @@ export class BuildStatsPlugin implements WebpackPluginInstance {
             callback(...r);
           });
         };
-      case 'sync':
+      }
+      case 'sync': {
         return (...args: any) => {
 
           if (name === PLUGIN_NAME) {
@@ -212,11 +215,13 @@ export class BuildStatsPlugin implements WebpackPluginInstance {
           this.recordPluginEnd(name, hook);
           return r;
         };
-      default:
+      }
+      default: {
         return;
+      }
     }
   }
-  private makeInterceptorFor = (_instance: string) => (hookName: string) => ({
+  private readonly makeInterceptorFor = (_instance: string) => (hookName: string) => ({
     register: (tapInfo: any) => {
       const { name, type, fn } = tapInfo;
       const newFn =

@@ -1,7 +1,7 @@
 import { createSelector } from '@ngrx/store';
 import { Configuration } from '@o3r/core';
 import { configurationAdapter } from './configuration.reducer';
-import { CONFIGURATION_STORE_NAME, ConfigurationState } from './configuration.state';
+import { CONFIGURATION_STORE_NAME, ConfigurationState, globalConfigurationId } from './configuration.state';
 
 const {selectIds, selectEntities, selectAll, selectTotal} = configurationAdapter.getSelectors();
 
@@ -29,9 +29,13 @@ export const selectConfigurationTotal = createSelector(selectConfigurationState,
 
 /**
  * Select the configuration for component with id
- *
  * @param props property of the selector
  * @param props.id id of the component
  */
 export const selectConfigurationForComponent = <T extends Configuration>(props: {id: string}) =>
   createSelector(selectConfigurationEntities, (entities) => (entities?.[props.id] || {}) as Configuration as T);
+
+/**
+ * Select the global configuration
+ */
+export const selectGlobalConfiguration = createSelector(selectConfigurationForComponent({ id: globalConfigurationId }), (config) => config);

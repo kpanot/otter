@@ -4,7 +4,8 @@ import { combineLatest, Observable, of } from 'rxjs';
 import { distinctUntilChanged, map, pairwise, shareReplay, startWith, switchMap, tap } from 'rxjs/operators';
 import { handleRuleEvaluationDebug } from './debug/helpers';
 import type { RulesEngine } from './engine';
-import { EngineRuleset, EvaluationReason, Facts, RuleEvaluation, RuleEvaluationOutput } from './engine.interface';
+import type { Facts } from './fact';
+import { EngineRuleset, EvaluationReason, RuleEvaluation, RuleEvaluationOutput } from './engine.interface';
 import { executeOperator } from './operator/operator.helpers';
 import { Operator } from './operator/operator.interface';
 import {
@@ -50,7 +51,6 @@ export class RulesetExecutor {
 
   /**
    * Create a new ruleset executor
-   *
    * @param ruleset Ruleset to evaluate
    * @param rulesEngine Instance of the rules engine
    */
@@ -58,12 +58,36 @@ export class RulesetExecutor {
     this.ruleset = ruleset;
     this.rulesEngine = rulesEngine;
     this.operators = rulesEngine.operators;
-    this.engineRuleset = this.prepareRuleset();
+    this.engineRuleset = this.plugRuleset();
+  }
+
+  /**
+   * Recursively explores a rule to identify and collect input facts.
+   * Input facts are identified based on the 'FACT' type and operator-specific implicit dependencies.
+   * @param currentObject The current object being explored.
+   * @param ruleInputFacts A set to store the identified input facts for the rule.
+   */
+  private collectRuleInputFacts(currentObject: AllBlock | NestedCondition | NestedCondition[], ruleInputFacts: Set<string>) {
+    if (currentObject && isOperandFact(currentObject)) {
+      ruleInputFacts.add(currentObject.value);
+    } else if (Array.isArray(currentObject)) {
+      currentObject.forEach((elem) => this.collectRuleInputFacts(elem, ruleInputFacts));
+    } else {
+      for (const key in currentObject) {
+        if ((key === 'operator') && isConditionProperties(currentObject)) {
+          const op = this.operators[currentObject[key]];
+          if (op && op.factImplicitDependencies) {
+            op.factImplicitDependencies.forEach(dep => ruleInputFacts.add(dep));
+          }
+        } else if (typeof currentObject[key as keyof (AllBlock | NestedCondition)] === 'object') {
+          this.collectRuleInputFacts(currentObject[key as keyof (AllBlock | NestedCondition)], ruleInputFacts);
+        }
+      }
+    }
   }
 
   /**
    * Report performance mark for a rule run
-   *
    * @param rule Rule to measure
    * @param status status of the rule evaluation
    */
@@ -79,12 +103,11 @@ export class RulesetExecutor {
 
   /**
    * Get operand value stream according to its type
-   *
    * @param operand operand of the condition
    * @param factsValue
    * @param runtimeFactValues
    */
-  protected getOperandValue(operand: GenericOperand | undefined, factsValue: Record<string, Facts>, runtimeFactValues: Record<string, Facts>): unknown | unknown[] {
+  protected getOperandValue(operand: GenericOperand | undefined, factsValue: Record<string, Facts | undefined>, runtimeFactValues: Record<string, Facts>): unknown {
     if (typeof operand === 'undefined') {
       return undefined;
     } else if (isOperandFact(operand)) {
@@ -103,27 +126,25 @@ export class RulesetExecutor {
    * Process a root rule from a ruleset, and return the associated actions to be processed
    * Will also update the runtimeFactValues map that is ruleset wise
    * Note that runtimeFactValues will be mutated by all the runtime facts actions executed
-   *
    * @param rule
    * @param factsValue
    * @param runtimeFactValues
    * @protected
    */
-  protected evaluateRule(rule: Rule, factsValue: Record<string, Facts>, runtimeFactValues: Record<string, Facts>) {
+  protected evaluateRule(rule: Rule, factsValue: Record<string, Facts | undefined>, runtimeFactValues: Record<string, Facts>) {
     return this.evaluateBlock(rule.rootElement, factsValue, runtimeFactValues);
   }
 
   /**
    * Recursively process a block to extract all the actions keeping the order
    * Note that runtimeFactValues will be mutated by all the runtime facts actions executed
-   *
    * @param element
    * @param actions
    * @param factsValue
    * @param runtimeFactValues This runtime fact map will be mutated by all the runtime facts actions executed
    * @protected
    */
-  protected evaluateBlock(element: AllBlock, factsValue: Record<string, Facts>, runtimeFactValues: Record<string, Facts>, actions: ActionBlock[] = []) {
+  protected evaluateBlock(element: AllBlock, factsValue: Record<string, Facts | undefined>, runtimeFactValues: Record<string, Facts>, actions: ActionBlock[] = []) {
     if (this.isIfElseBlock(element)) {
       (!element.condition || this.evaluateCondition(element.condition, factsValue, runtimeFactValues) ? element.successElements : element.failureElements)
         .forEach((elementResult) => this.evaluateBlock(elementResult, factsValue, runtimeFactValues, actions));
@@ -139,7 +160,6 @@ export class RulesetExecutor {
 
   /**
    * Returns true if the element is a IfElse block
-   *
    * @param element
    * @protected
    */
@@ -149,7 +169,6 @@ export class RulesetExecutor {
 
   /**
    * Returns true if the element is an action block
-   *
    * @param element
    * @protected
    */
@@ -159,7 +178,6 @@ export class RulesetExecutor {
 
   /**
    * Returns true if the action sets a temporary fact
-   *
    * @param element
    * @protected
    */
@@ -169,65 +187,66 @@ export class RulesetExecutor {
 
   /**
    * Evaluate a condition block
-   *
    * @param nestedCondition
    * @param factsValue
    * @param runtimeFactValues
    * @protected
    */
-  protected evaluateCondition(nestedCondition: NestedCondition, factsValue: Record<string, Facts>, runtimeFactValues: Record<string, Facts>): boolean {
+  protected evaluateCondition(nestedCondition: NestedCondition, factsValue: Record<string, Facts | undefined>, runtimeFactValues: Record<string, Facts>): boolean {
     if (isConditionProperties(nestedCondition)) {
       const operator = this.operators[nestedCondition.operator];
       if (operator === undefined) {
         throw new Error(`Unknown operator : ${nestedCondition.operator}, skipping the rule execution...`);
       }
       return executeOperator(this.getOperandValue(nestedCondition.lhs, factsValue, runtimeFactValues),
-        this.getOperandValue('rhs' in nestedCondition ? nestedCondition.rhs : undefined, factsValue, runtimeFactValues), operator);
+        this.getOperandValue('rhs' in nestedCondition ? nestedCondition.rhs : undefined, factsValue, runtimeFactValues), operator, factsValue);
     }
 
     if (isNotCondition(nestedCondition)) {
       return !this.evaluateCondition(nestedCondition.not, factsValue, runtimeFactValues);
     }
     if (nestedCondition.all || nestedCondition.any) {
-      const children = (nestedCondition.all || nestedCondition.any).map((condition) => this.evaluateCondition(condition, factsValue, runtimeFactValues));
-      return isAllConditions(nestedCondition) ? children.every((value) => value) : children.some((value) => value);
+      const evaluate = (condition: NestedCondition) => this.evaluateCondition(condition, factsValue, runtimeFactValues);
+      return isAllConditions(nestedCondition) ? nestedCondition.all.every(evaluate) : nestedCondition.any.some(evaluate);
     }
     throw new Error(`Unknown condition block met : ${JSON.stringify(nestedCondition)}`);
   }
 
   /**
    * Plug ruleset to fact streams and trigger a first evaluation
-   *
-   * @param ruleset
    */
-  public prepareRuleset() {
-    const rulesWithContext: Rule[] = [];
-    const rulesWithoutContext: Rule[] = [];
+  protected plugRuleset() {
+    const inputFactsForRule: Record<string, string[]> = {};
+    const findRuleInputFacts = (obj: AllBlock): string[] => {
+      const ruleInputFacts = new Set<string>();
+      this.collectRuleInputFacts(obj, ruleInputFacts);
+      return Array.from(ruleInputFacts);
+    };
+    this.ruleset.rules.forEach((rule) => inputFactsForRule[rule.id] = findRuleInputFacts(rule.rootElement));
     const factsThatRerunEverything: string[] = [];
     this.ruleset.rules.forEach((rule) => {
       if (rule.outputRuntimeFacts.length > 0 || rule.inputRuntimeFacts.length > 0) {
-        rulesWithContext.push(rule);
-        factsThatRerunEverything.push(...rule.inputFacts);
+        factsThatRerunEverything.push(...inputFactsForRule[rule.id]);
       } else {
-        rulesWithoutContext.push(rule);
       }
     });
-    const triggerFull: Observable<unknown[]> = factsThatRerunEverything.length === 0 ? of([]) :
+    const triggerFull$: Observable<unknown[]> = factsThatRerunEverything.length === 0 ? of([]) :
       combineLatest(factsThatRerunEverything.map((fact) => this.rulesEngine.retrieveOrCreateFactStream(fact)));
-    const result$ = triggerFull.pipe(switchMap(() => {
+    const result$ = triggerFull$.pipe(switchMap(() => {
       const runtimeFactValues: Record<string, Facts> = {};
 
       let rulesetInputFacts: string[];
       if (this.rulesEngine.debugMode) {
         rulesetInputFacts = Array.from(this.ruleset.rules.reduce((acc, rule) => {
-          rule.inputFacts.forEach((factName) => acc.add(factName));
+          inputFactsForRule[rule.id].forEach((factName) => acc.add(factName));
           return acc;
         }, new Set<string>()));
       }
 
       return combineLatest(this.ruleset.rules.map((rule) => {
-        const values$ = rule.inputFacts.map((fact) => this.rulesEngine.retrieveOrCreateFactStream(fact));
-        return (values$.length ? combineLatest(values$) : of([[]]))
+        const inputFacts = inputFactsForRule[rule.id];
+        const values$ = inputFacts.map((fact) => this.rulesEngine.retrieveOrCreateFactStream(fact));
+        return (values$.length ? combineLatest(values$) : of([[]] as (Facts | undefined)[]))
           .pipe(
             startWith(undefined),
             pairwise(),
@@ -236,7 +255,7 @@ export class RulesetExecutor {
               const output: RuleEvaluationOutput = {actions: undefined};
 
               try {
-                output.actions = this.evaluateRule(rule, rule.inputFacts.reduce((acc, id, index) => {
+                output.actions = this.evaluateRule(rule, inputFacts.reduce<Record<string, Facts | undefined>>((acc, id, index) => {
                   acc[id] = factValues![index];
                   return acc;
                 }, {}), runtimeFactValues);
@@ -246,7 +265,7 @@ export class RulesetExecutor {
               }
 
               if (this.rulesEngine.debugMode) {
-                output.evaluation = handleRuleEvaluationDebug(rule, this.ruleset.name, output.actions, output.error, runtimeFactValues, factValues, oldFactValues);
+                output.evaluation = handleRuleEvaluationDebug({ ...rule, inputFacts }, this.ruleset.name, output.actions, output.error, runtimeFactValues, factValues, oldFactValues);
               } else if (output.error) {
                 this.rulesEngine.logger?.error(output.error);
                 this.rulesEngine.logger?.warn(`Skipping rule ${rule.name}, and the associated ruleset`);
@@ -263,6 +282,7 @@ export class RulesetExecutor {
           const allExecutionsValid = actionsLists.every((actions) => !!actions);
 
           let execInfo: {
+            executionCounter?: number;
             actionsLists: ActionBlock[][];
             rulesetOutputExecution?: RuleEvaluation[];
             allExecutionsValid?: boolean;
@@ -270,11 +290,10 @@ export class RulesetExecutor {
           } = {actionsLists: (allExecutionsValid ? actionsLists : [[]]) as ActionBlock[][]};
 
           if (this.rulesEngine.engineDebug) {
-            this.executionCounter++;
             execInfo = {
               ...execInfo,
               ...this.rulesEngine.engineDebug.handleDebugRulesetExecutionInfo(
-                currRes!, prevRes, allExecutionsValid, rulesetInputFacts, runtimeFactValues, this.executionCounter, this.ruleset)
+                currRes!, prevRes, allExecutionsValid, rulesetInputFacts, runtimeFactValues, ++this.executionCounter, this.ruleset)
             };
           }
           return execInfo;
@@ -283,7 +302,7 @@ export class RulesetExecutor {
           const outputActions = ([] as ActionBlock[]).concat(...output.actionsLists);
 
           if (this.rulesEngine.engineDebug && output.allExecutionsValid) {
-            this.rulesEngine.engineDebug.addRulesetExecutionEvent(this.ruleset, this.executionCounter,
+            this.rulesEngine.engineDebug.addRulesetExecutionEvent(this.ruleset, output.executionCounter!,
               rulesetInputFacts, outputActions, runtimeFactValues, output.rulesetTriggers!,
               output.rulesetOutputExecution!);
           }
@@ -292,7 +311,7 @@ export class RulesetExecutor {
         }),
         distinctUntilChanged((prev, curr) => prev.length === 0 && curr.length === 0)
       );
-    }), shareReplay(1));
+    }), shareReplay({bufferSize: 1, refCount: true}));
 
     return {
       id: this.ruleset.id,
@@ -301,5 +320,4 @@ export class RulesetExecutor {
       rulesResultsSubject$: result$
     } as EngineRuleset;
   }
-
 }

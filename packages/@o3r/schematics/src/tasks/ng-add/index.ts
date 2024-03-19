@@ -1,5 +1,7 @@
 import { TaskConfiguration, TaskConfigurationGenerator } from '@angular-devkit/schematics';
 import { NodePackageName, NodePackageTaskOptions } from '@angular-devkit/schematics/tasks/package-manager/options';
+import type { NodeDependencyType } from '@schematics/angular/utility/dependencies';
+import { getPackageManager } from '../../utility/package-manager-runner';
 
 /**
  * Options to be passed to the ng add task
@@ -19,10 +21,19 @@ export interface NgAddPackageOptions {
 
   /** Name of the project */
   projectName?: string | null;
+
+  /**
+   * Type of dependency to install
+   */
+  dependencyType?: NodeDependencyType;
+
+  /** Flag to skip the execution of ng add and only install the package. Used mostly for external packages */
+  skipNgAddSchematicRun?: boolean;
 }
 
+/** @deprecated use {@link setupDependencies} instead, will be removed in V11 */
 export class NodePackageNgAddTask implements TaskConfigurationGenerator<NodePackageTaskOptions> {
-  public quiet = true;
+  public quiet = false;
 
   constructor(public packageName: string, public options?: NgAddPackageOptions) {}
 
@@ -38,8 +49,8 @@ export class NodePackageNgAddTask implements TaskConfigurationGenerator<NodePack
         quiet: this.quiet,
         workingDirectory: this.options?.workingDirectory,
         packageName: `ng add ${this.packageName}${this.options?.version ? '@' + this.options.version : ''} ${cmdArguments.join(' ')}`,
-        packageManager: 'yarn'
+        packageManager: getPackageManager()
       }
-    };
+    } as TaskConfiguration<NodePackageTaskOptions>;
   }
 }

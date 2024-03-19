@@ -1,11 +1,10 @@
 {
   "extends": "../../../tsconfig.jest",
-  "compilerOptions": {
-    "types": [
-      "node",
-      "jest"
-    ]
-  },
+  "references": [
+    {
+      "path": "./tsconfig.build.json"
+    }
+  ],
   "include": [
     "./src/**/*.spec.ts",
   ],

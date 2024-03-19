@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 
 /* eslint-disable @typescript-eslint/restrict-template-expressions */
-import { bold } from 'chalk';
+import { blue, bold, green, grey } from 'chalk';
 import { program } from 'commander';
 import * as globby from 'globby';
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import * as semver from 'semver';
+import type { PackageJson } from 'type-fest';
 import * as winston from 'winston';
 import { DependencyInfo, DependencyToUpdate, Options, PackageJsonWithOtterConfiguration } from '../helpers/version-harmonize/interfaces';
 
@@ -19,13 +20,20 @@ const logger = winston.createLogger({
   transports: new winston.transports.Console()
 });
 
+logger.warn(`Version-harmonize is ${bold.yellow('deprecated')}, please use the ${green('@o3r/json-dependency-versions-harmonize')} from ESLint ${blue('@o3r/eslint-plugin')} plugin`);
+
 program
-  .description('Replace the dependencies version in a monorepos')
+  .description('[DEPRECATED] Replace the dependencies version in a monorepos')
   .option('-m, --monorepo <package>', 'Path to the private package.json of the monorepo', (filePath) => path.resolve(process.cwd(), filePath), path.resolve(process.cwd(), 'package.json'))
   .option('-t, --dependency-types <...types>', 'List of dependency types to update, comma separated', (types) => types.split(','),
     ['optionalDependencies', 'dependencies', 'devDependencies', 'peerDependencies', 'generatorDependencies'])
   .option('-v, --verbose', 'Display debug logs')
   .option('-a, --align-peer-dependencies', 'Enforce to align the version of the dependencies with the latest range')
+  .option('--apply-to <...globs>', `List of path globs of files to which apply the new calculated version without implicating them in the version determination (separated by ${path.delimiter})`,
+    (g, mem: string[]) => ([
+      ...mem,
+      ...g.split(path.delimiter).map((p) => path.posix.join(process.cwd().replace(/\\/g, '/'), p))
+    ]), [])
   .parse(process.argv);
 
 /** Options from CLI */
@@ -35,7 +43,6 @@ logger.level = options.verbose ? 'debug' : 'info';
 
 /**
  * Retrieve the best range for a dependency.
- *
  * @param dependencies List of extracted dependencies
  * @param dependencyName Name of the dependency to retrieve the best range
  * @returns Dependency information of the best range
@@ -54,7 +61,7 @@ const getLatestRange = (dependencies: DependencyInfo[], dependencyName: string):
         } else if (!minAccVersion) {
           return current;
         }
-        return semver.lt(minCurrentVersion, minAccVersion) ? acc : current;
+        return semver.lte(minCurrentVersion, minAccVersion) ? acc : current;
       }
     }, undefined);
 
@@ -64,7 +71,6 @@ const getLatestRange = (dependencies: DependencyInfo[], dependencyName: string):
 
 /**
  * Update the package.json with the best range for a dependency
- *
  * @param packageJsonUpdates List of package.json to update
  * @param bestRangeDependencies Mapping of the best range for each dependency
  */
@@ -87,7 +93,8 @@ const updatePackageJson = async (packageJsonUpdates: DependencyToUpdate[], bestR
         const packageJson = toUpdate[0].packageJson;
         toUpdate.forEach((update) => {
           (packageJson[update.type] as Record<string, string>)[update.dependencyName] = bestRangeDependencies[update.dependencyName].range;
-          logger.info(`Update ${bold(update.dependencyName)} to ${bold(bestRangeDependencies[update.dependencyName].range)} in ${bold(update.packageJson.name)}`);
+          logger.info(`Update ${bold(update.dependencyName)} to ${bold(bestRangeDependencies[update.dependencyName].range)} in ${bold(update.packageJson.name)}` +
+          ` ${grey(`(${path.relative(process.cwd(), update.path)})`)}`);
           logger.debug(`Reason: ${update.reason}`);
         });
         await fs.writeFile(packagePath, JSON.stringify(packageJson, null, 2) + '\n');
@@ -95,12 +102,35 @@ const updatePackageJson = async (packageJsonUpdates: DependencyToUpdate[], bestR
   );
 };
 
+/**
+ * Update the package.json with the version of the package manager used by the monorepo
+ * @param packageJsonPaths List of package.json paths to update
+ * @param packageManager Package manager
+ */
+const updatePackageJsonPackageManager = async (packageJsonPaths: string[], packageManager: string | undefined) => {
+  if (!packageManager) {
+    logger.debug('No package manager specified in the monorepo package.json file');
+    return;
+  }
+
+  for (const packageJsonPath of packageJsonPaths) {
+    const packageJson: PackageJson = JSON.parse(await fs.readFile(packageJsonPath, { encoding: 'utf-8' }));
+    logger.info(`Update packageManager from ${bold(packageJson.packageManager)} to ${bold(packageManager)} in ${bold(packageJson.name)} ${grey(`(${path.relative(process.cwd(), packageJsonPath)})`)}`);
+    packageJson.packageManager = packageManager;
+    await fs.writeFile(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n');
+  }
+};
+
 void (async () => {
-  const workspaces: string[] | undefined = require(options.monorepo).workspaces;
-  const packageJsonPatterns = workspaces?.map((packagePath) => path.posix.join(packagePath, 'package.json'));
+  // eslint-disable-next-line max-len
+  logger.warn('This script is deprecated and will be removed in v12, please use the linter rule @o3r/json-dependency-versions-harmonize instead (documentation available https://github.com/AmadeusITGroup/otter/blob/main/docs/linter/eslint-plugin/rules/json-dependency-versions-harmonize.md)');
+  const monorepoPackage: PackageJson = require(options.monorepo);
+  const { workspaces, packageManager } = monorepoPackage;
+  const packageJsonPatterns = (Array.isArray(workspaces) ? workspaces : (workspaces && workspaces.packages))?.map((packagePath) => path.posix.join(packagePath, 'package.json'));
 
   /** List of all package.json of the workspace */
   const packageJsonPathLists = packageJsonPatterns && await globby(packageJsonPatterns);
+  const packagePathToUpdateThePackageManager: string[] = [];
   /** Map of dependencies for each dependency name */
   const dependencyMaps: Record<string, DependencyInfo[]> = {};
 
@@ -117,6 +147,9 @@ void (async () => {
     if (packageJson.otter?.versionHarmonize?.skipPackage) {
       logger.debug(`${packageJson.name} is ignored`);
       continue;
+    }
+    if (!packageJson.otter?.versionHarmonize?.ignorePackageManager && packageJson.packageManager && packageManager && packageManager !== packageJson.packageManager) {
+      packagePathToUpdateThePackageManager.push(packageJsonPath);
     }
     const ignorePatterns = packageJson.otter?.versionHarmonize?.ignore?.map((ignorePattern) => new RegExp(ignorePattern));
     options.dependencyTypes
@@ -147,7 +180,40 @@ void (async () => {
       return acc;
     }, {});
 
-  /** List of the dependencies to update with ehe best ranges */
+  // Add the ApplyTo files after the version calculation to benefice of the new range without being part of the calculation
+  if (options.applyTo.length > 0) {
+    const applyToFiles = await globby(options.applyTo);
+    for (const packageJsonPath of applyToFiles) {
+      let packageJson: PackageJson;
+      try {
+        packageJson = await JSON.parse(await fs.readFile(packageJsonPath, { encoding: 'utf8' }));
+      } catch {
+        logger.debug(`ignored ${packageJsonPath} because the JSON parse has failed`);
+        continue;
+      }
+      if (packageJson.packageManager && packageManager && !packageManager.includes('<%') && packageManager !== packageJson.packageManager) {
+        packagePathToUpdateThePackageManager.push(packageJsonPath);
+      }
+      options.dependencyTypes
+        .filter((dependencyType) => !!packageJson[dependencyType])
+        .forEach((dependencyType) => {
+          Object.entries(packageJson[dependencyType] as Record<string, string>)
+            .filter(([, range]) => semver.validRange(range)) // skip the dependencies that are generated in case of template
+            .forEach(([dependencyName, range]) => {
+              dependencyMaps[dependencyName] ||= [];
+              dependencyMaps[dependencyName].push({
+                path: packageJsonPath,
+                packageJson,
+                range,
+                dependencyName,
+                type: dependencyType
+              });
+            });
+        });
+    }
+  }
+
+  /** List of the dependencies to update with the best ranges */
   const dependenciesToUpdate = Object.entries(bestRangeDependencies)
     .reduce<DependencyToUpdate[]>((acc, [depName, depInfo]) => {
       if (!depInfo) {
@@ -168,5 +234,6 @@ void (async () => {
     }, []);
 
   await updatePackageJson(dependenciesToUpdate, bestRangeDependencies);
+  await updatePackageJsonPackageManager(packagePathToUpdateThePackageManager, packageManager);
 
 })();

@@ -1,79 +1,98 @@
+import type { DirEntry, FileEntry } from '@angular-devkit/schematics';
 import { SchematicsException, Tree } from '@angular-devkit/schematics';
-import * as commentJson from 'comment-json';
-import { sync as globbySync } from 'globby';
+import { NodeDependencyType } from '@schematics/angular/utility/dependencies';
 import { minimatch } from 'minimatch';
 import * as path from 'node:path';
 import type { PackageJson } from 'type-fest';
 import type { WorkspaceProject, WorkspaceSchema } from '../interfaces/index';
 
-/**
- * Load the angular.json file
- *
- * @param tree File tree
- * @param angularJsonFile Angular.json file path
- * @throws Angular JSON invalid or non exist
- */
-export function readAngularJson(tree: Tree, angularJsonFile = '/angular.json'): WorkspaceSchema {
-  const workspaceConfig = tree.read(angularJsonFile);
-  if (!workspaceConfig) {
-    throw new SchematicsException('Could not find Angular workspace configuration');
+function findFilesInTreeRec(memory: Set<FileEntry>, directory: DirEntry, fileMatchesCriteria: (file: string) => boolean, ignoreDirectories: string[]) {
+  if (ignoreDirectories.some(i => directory.path.split(path.posix.sep).includes(i))) {
+    return memory;
   }
 
-  return commentJson.parse(workspaceConfig.toString()) as any;
+  directory.subfiles
+    .filter(fileMatchesCriteria)
+    .forEach((file) => memory.add(directory.file(file)!));
+
+  directory.subdirs
+    .forEach((dir) => findFilesInTreeRec(memory, directory.dir(dir), fileMatchesCriteria, ignoreDirectories));
+
+  return memory;
+}
+
+/**
+ *
+ * Helper function that looks for files in the Tree
+ * @param directory where to perform the search
+ * @param fileMatchesCriteria a function defining the criteria to look for
+ * @param ignoreDirectories optional parameter to ignore folders
+ */
+export function findFilesInTree(directory: DirEntry, fileMatchesCriteria: (file: string) => boolean, ignoreDirectories: string[] = ['node_modules', '.git', '.yarn']) {
+  const memory = new Set<FileEntry>();
+  findFilesInTreeRec(memory, directory, fileMatchesCriteria, ignoreDirectories);
+  return Array.from(memory);
+}
+
+/**
+ * Load the Workspace configuration object
+ * @param tree File tree
+ * @param workspaceConfigFile Workspace config file path, /angular.json in an Angular project
+ * @returns null if the given config file does not exist
+ */
+export function getWorkspaceConfig<T extends WorkspaceSchema = WorkspaceSchema>(tree: Tree, workspaceConfigFile = '/angular.json'): WorkspaceSchema | null {
+  if (!tree.exists(workspaceConfigFile)) {
+    return null;
+  }
+  return tree.readJson(workspaceConfigFile) as unknown as T;
 }
 
 /**
  * Update angular.json file
- *
  * @param tree File tree
  * @param workspace Angular workspace
+ * @param angularJsonFile Angular.json file path
  */
-export function writeAngularJson(tree: Tree, workspace: WorkspaceSchema) {
-  tree.overwrite('/angular.json', commentJson.stringify(workspace, null, 2));
+export function writeAngularJson(tree: Tree, workspace: WorkspaceSchema, angularJsonFile = '/angular.json') {
+  tree.overwrite(angularJsonFile, JSON.stringify(workspace, null, 2));
   return tree;
 }
 
 /**
  * Load the target's package.json file
- *
  * @param tree File tree
  * @param workspaceProject Angular workspace project
  * @throws Package JSON invalid or non exist
  */
 export function readPackageJson(tree: Tree, workspaceProject: WorkspaceProject) {
-  // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-  const workspaceConfig = tree.read(`${workspaceProject.root}/package.json`);
-  if (!workspaceConfig) {
+  const packageJsonPath = `${workspaceProject.root}/package.json`;
+  if (!tree.exists(packageJsonPath)) {
     throw new SchematicsException('Could not find NPM Package');
   }
 
-  return commentJson.parse(workspaceConfig.toString()) as PackageJson;
+  const workspaceConfig = tree.readJson(packageJsonPath);
+  return workspaceConfig as PackageJson;
 }
 
 /**
- * Get the workspace project
- *
- * @param tree File tree
- * @param projectName Name of the Angular project
+ * Return the type of install to run depending on the project type (Peer or default)
+ * @deprecated use {@link getProjectNewDependenciesTypes instead}, will be removed in V11
+ * @param project
  */
-export function getProjectFromTree(tree: Tree, projectName?: string | null): WorkspaceProject {
-  const workspace = readAngularJson(tree);
-  return workspace.projects[projectName || workspace.defaultProject || Object.keys(workspace.projects)[0]];
+export function getProjectNewDependenciesType(project?: WorkspaceProject) {
+  return project?.projectType === 'library' ? NodeDependencyType.Peer : NodeDependencyType.Default;
 }
 
 /**
- * Get the default project name
- *
- * @param tree File tree
+ * Return the types of install to run depending on the project type
+ * @param project
  */
-export function getDefaultProjectName(tree: Tree): string {
-  const workspace = readAngularJson(tree);
-  return workspace.defaultProject || Object.keys(workspace.projects)[0];
+export function getProjectNewDependenciesTypes(project?: WorkspaceProject): NodeDependencyType[] {
+  return project?.projectType === 'library' ? [NodeDependencyType.Peer, NodeDependencyType.Dev] : [NodeDependencyType.Default];
 }
 
 /**
  * Get the folder of the templates for a specific sub-schematics
- *
  * @param rootPath Root directory of the schematics ran
  * @param currentPath Directory of the current sub-schematics ran
  * @param templateFolder Folder containing the templates
@@ -85,81 +104,80 @@ export function getTemplateFolder(rootPath: string, currentPath: string, templat
 
 /**
  * Get the path of all the files in the Tree
- *
  * @param basePath Base path from which starting the list
  * @param tree Schematics file tree
  * @param excludes Array of globs to be ignored
+ * @param recursive determine if the function will walk through the sub folders
  */
-export function getAllFilesInTree(tree: Tree, basePath = '/', excludes: string[] = []): string[] {
+export function getAllFilesInTree(tree: Tree, basePath = '/', excludes: string[] = [], recursive = true): string[] {
   if (excludes.length && excludes.some((e) => minimatch(basePath, e, {dot: true}))) {
     return [];
   }
   return [
     ...tree.getDir(basePath).subfiles.map((file) => path.posix.join(basePath, file)),
-    ...tree.getDir(basePath).subdirs
-      .flatMap((dir) => getAllFilesInTree(tree, path.posix.join(basePath, dir), excludes))
+    ...(recursive ? tree.getDir(basePath).subdirs.flatMap((dir) => getAllFilesInTree(tree, path.posix.join(basePath, dir), excludes, recursive)) : [])
   ];
 }
 
 /**
- * Get all files with specific extension from the specified folder for all the projects described in the workspace
- *
- * @deprecated please use `getFilesInFolderFromWorkspaceProjectsInTree`, will be removed in v9
- * @param tree
- * @param extension
- * @param folderInProject
+ * Get the path of all the files in the Tree
+ * @param tree Schematics file tree
+ * @param patterns Array of globs to be search in the tree
  */
-export function getFilesInFolderFromWorkspaceProjects(tree: Tree, folderInProject: string, extension: string) {
-  const workspace = readAngularJson(tree);
-  const projectSources = Object.values(workspace.projects)
-    .map((project) => path.join(project.root, folderInProject, '**', `*.${extension}`).replace(/\\/g, '/'));
-
-  return projectSources.reduce((acc, projectSource) => {
-    acc.push(...globbySync(projectSource, {ignore: ['**/node_modules/**']}));
-    return acc;
-  }, [] as string[]);
+export function globInTree(tree: Tree, patterns: string[]): string[] {
+  const files = getAllFilesInTree(tree);
+  return files.filter((basePath) => patterns.some((p) => minimatch(basePath, p, { dot: true })));
 }
 
 /**
  * Get all files with specific extension from the specified folder for all the projects described in the workspace
- *
  * @param tree
- * @param extension
  * @param folderInProject
+ * @param extension
  */
 export function getFilesInFolderFromWorkspaceProjectsInTree(tree: Tree, folderInProject: string, extension: string) {
-  const workspace = readAngularJson(tree);
-  const extensionMatcher = new RegExp(`\\.${extension}$`);
+  const workspace = getWorkspaceConfig(tree);
+  const extensionMatcher = new RegExp(`\\.${extension.replace(/^\./, '')}$`);
   const excludes = ['**/node_modules/**', '**/.cache/**'];
-  return Object.values(workspace.projects)
+  return Object.values(workspace?.projects || {})
     .flatMap((project) => getAllFilesInTree(tree, path.posix.join(project.root, folderInProject), excludes))
+    .filter((filePath) => extensionMatcher.test(filePath));
+}
+
+
+/**
+ * Get all files with specific extension from the tree
+ * @param tree
+ * @param extension
+ */
+export function getFilesWithExtensionFromTree(tree: Tree, extension: string) {
+  const excludes = ['**/node_modules/**', '**/.cache/**'];
+  const extensionMatcher = new RegExp(`\\.${extension}$`);
+  return getAllFilesInTree(tree, '/', excludes)
     .filter((filePath) => extensionMatcher.test(filePath));
 }
 
 /**
  * Get all files with specific extension from the root of all the projects described in the workspace
- *
  * @param tree
  * @param extension
  */
 export function getFilesFromRootOfWorkspaceProjects(tree: Tree, extension: string) {
-  return getFilesInFolderFromWorkspaceProjects(tree, '', extension);
+  return getFilesInFolderFromWorkspaceProjectsInTree(tree, '', extension);
 }
 
 /**
  * Get all files with specific extension from the src folder for all the projects described in the workspace
- *
  * @param tree
  * @param extension
  */
 export function getFilesFromWorkspaceProjects(tree: Tree, extension: string) {
-  return getFilesInFolderFromWorkspaceProjects(tree, 'src', extension);
+  return getFilesInFolderFromWorkspaceProjectsInTree(tree, 'src', extension);
 }
 
 
 /**
  * Get all the typescript files from the src folder for all the projects described in the workspace
- *
  * @param tree
  */
 export function getSourceFilesFromWorkspaceProjects(tree: Tree) {

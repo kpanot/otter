@@ -1,58 +1,90 @@
 import { chain, noop, Rule } from '@angular-devkit/schematics';
-import { applyEsLintFix, getPackageVersion, install, ngAddPackages, removePackages } from '@o3r/schematics';
-import { createAzurePipeline, generateRenovateConfig, o3rBasicUpdates, updateAdditionalModules, updateCmsAdapter,
-  updateCustomizationEnvironment, updateFixtureConfig, updateLinter,
-  updateOtterEnvironmentAdapter, updatePlaywright, updateStore } from '../rule-factories/index';
-import { NgAddSchematicsSchema } from './schema';
-import { updateBuildersNames as updateBuildersNamesFromV7 } from './updates-for-v8/cms-adapters/update-builders-names';
-import { updateOtterGeneratorsNames as updateOtterGeneratorsNamesFromV7 } from './updates-for-v8/generators/update-generators-names';
-import { updateImports as updateImportsFromV7 } from './updates-for-v8/imports/update-imports-from-v7-to-v8';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { packagesToRemove } from './updates-for-v8/replaced-packages';
+import type { PackageJson } from 'type-fest';
+import { getExternalPreset, presets } from '../shared/presets';
+import { NgAddSchematicsSchema } from './schema';
+import { askConfirmation } from '@angular/cli/src/utilities/prompt';
+import { createSchematicWithMetricsIfInstalled, displayModuleListRule, registerPackageCollectionSchematics, setupSchematicsDefaultParams } from '@o3r/schematics';
+import { prepareProject } from './project-setup/index';
+import {
+  type DependencyToAdd,
+  setupDependencies,
+  type SetupDependenciesOptions
+} from '@o3r/schematics';
+import { NodeDependencyType } from '@schematics/angular/utility/dependencies';
+
+const workspacePackageName = '@o3r/workspace';
+const o3rDevDependencies = [
+  '@o3r/schematics'
+];
+
 /**
  * Add Otter library to an Angular Project
- *
  * @param options
  */
-export function ngAdd(options: NgAddSchematicsSchema): Rule {
+function ngAddFn(options: NgAddSchematicsSchema): Rule {
+  const corePackageJsonContent = JSON.parse(fs.readFileSync(path.resolve(__dirname, '..', '..', 'package.json'), {encoding: 'utf-8'})) as PackageJson;
+  const o3rCoreVersion = corePackageJsonContent.version!;
+  const o3rVersionRange = options.exactO3rVersion ? o3rCoreVersion : `~${o3rCoreVersion}`;
 
-  const o3rCoreVersion = getPackageVersion(path.resolve(__dirname, '..', '..', 'package.json'));
+  return (): Rule => {
+    const dependenciesSetupConfig: SetupDependenciesOptions = {
+      projectName: options.projectName,
+      dependencies: o3rDevDependencies.reduce((acc, dep) => {
+        acc[dep] = {
+          inManifest: [{
+            range: o3rVersionRange,
+            types: [NodeDependencyType.Dev]
+          }],
+          ngAddOptions: { exactO3rVersion: options.exactO3rVersion }
+        };
+        return acc;
+      }, {} as Record<string, DependencyToAdd>),
+      ngAddToRun: [...o3rDevDependencies]
+    };
 
-  const internalPackagesToInstallWithNgAdd = Array.from(new Set([
-    ...(options.enableCms ? ['@o3r/localization', '@o3r/styling', '@o3r/components', '@o3r/configuration'] : []),
-    ...(options.enableStyling ? ['@o3r/styling'] : []),
-    ...(options.enableConfiguration ? ['@o3r/configuration'] : []),
-    ...(options.enableLocalization ? ['@o3r/localization'] : []),
-    ...(options.enableCustomization ? ['@o3r/components', '@o3r/configuration'] : []),
-    ...(options.enableAnalytics ? ['@o3r/analytics'] : []),
-    ...(options.enableApisManager ? ['@o3r/apis-manager'] : []),
-    ...(options.enableStorybook ? ['@o3r/storybook'] : []),
-    ...(options.enablePlaywright ? ['@o3r/testing'] : []),
-    ...(options.enableRulesEngine ? ['@o3r/rules-engine'] : [])
-  ]));
-  const externalPackagesToInstallWithNgAdd = Array.from(new Set([
-    ...(options.enablePrefetchBuilder ? ['@o3r/ngx-prefetch'] : [])
-  ]));
-  return chain([
-    o3rBasicUpdates(options.projectName, o3rCoreVersion),
-    updateImportsFromV7(),
-    updateBuildersNamesFromV7(),
-    updateOtterGeneratorsNamesFromV7(),
-    options.enableCms ? updateCmsAdapter(options, __dirname) : noop,
-    updateOtterEnvironmentAdapter(options, __dirname),
-    updateStore(options, __dirname),
-    updateFixtureConfig(options, __dirname),
-    options.enableCustomization ? updateCustomizationEnvironment(__dirname, o3rCoreVersion, options) : noop,
-    options.generateAzurePipeline ? createAzurePipeline(options, __dirname) : noop,
-    options.enablePlaywright ? updatePlaywright(__dirname) : noop,
-    updateLinter(options, __dirname, o3rCoreVersion),
-    updateAdditionalModules(options, __dirname),
-    generateRenovateConfig(__dirname),
-    removePackages(packagesToRemove),
-    options.skipLinter ? noop() : applyEsLintFix(),
-    // dependencies for store (mainly ngrx, store dev tools, storage sync), playwright, linter are installed by hand if the option is active
-    options.skipInstall ? noop() : install,
-    ngAddPackages(internalPackagesToInstallWithNgAdd, {skipConfirmation: true, version: o3rCoreVersion, parentPackageInfo: '@o3r/core - setup', projectName: options.projectName}),
-    ngAddPackages(externalPackagesToInstallWithNgAdd, {skipConfirmation: true, parentPackageInfo: '@o3r/core - setup', projectName: options.projectName})
-  ]);
+    if (!options.projectName) {
+      dependenciesSetupConfig.dependencies[workspacePackageName] = {
+        toWorkspaceOnly: true,
+        inManifest: [{
+          range: o3rVersionRange,
+          types: [NodeDependencyType.Default]
+        }],
+        ngAddOptions: { exactO3rVersion: options.exactO3rVersion }
+      };
+      (dependenciesSetupConfig.ngAddToRun ||= []).push(workspacePackageName);
+    }
+
+    return chain([
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      setupSchematicsDefaultParams({ '*:ng-add': { registerDevtool: options.withDevtool } }),
+      options.projectName ? prepareProject(options, dependenciesSetupConfig) : noop(),
+      registerPackageCollectionSchematics(corePackageJsonContent),
+      async (t, c) => {
+        const { preset, externalPresets, ...forwardOptions } = options;
+        const presetRunner = await presets[preset]({ projectName: forwardOptions.projectName, forwardOptions });
+        const externalPresetRunner = externalPresets ? await getExternalPreset(externalPresets, t, c)?.({ projectName: forwardOptions.projectName, forwardOptions }) : undefined;
+        const modules = [...new Set([...(presetRunner.modules || []), ...(externalPresetRunner?.modules || [])])];
+        if (modules.length) {
+          c.logger.info(`The following modules will be installed: ${modules.join(', ')}`);
+          if (c.interactive && !await askConfirmation('Would you like to process to the setup of these modules?', true)) {
+            return;
+          }
+        }
+        return () => chain([
+          presetRunner.rule,
+          externalPresetRunner?.rule || noop()
+        ])(t, c);
+      },
+      options.projectName ? displayModuleListRule({ packageName: options.projectName }) : noop(),
+      setupDependencies(dependenciesSetupConfig)
+    ]);
+  };
 }
+
+/**
+ * Add Otter library to an Angular Project
+ * @param options
+ */
+export const ngAdd = createSchematicWithMetricsIfInstalled(ngAddFn);

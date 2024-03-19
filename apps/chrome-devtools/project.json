@@ -2,6 +2,7 @@
   "name": "chrome-devtools",
   "$schema": "https://raw.githubusercontent.com/nrwl/nx/master/packages/nx/schemas/project-schema.json",
   "projectType": "library",
+  "root": "apps/chrome-devtools",
   "sourceRoot": "apps/chrome-devtools/src",
   "prefix": "o3r",
   "targets": {
@@ -20,14 +21,13 @@
         "^build",
         "build-panel",
         "build-components",
-        "build-extension"
+        "build-extension",
+        "copy-assets"
       ]
     },
     "build-components": {
-      "executor": "@angular-devkit/build-angular:browser",
-      "outputs": [
-        "{projectRoot}/dist/components"
-      ],
+      "executor": "@angular-devkit/build-angular:browser-esbuild",
+      "outputs": ["{projectRoot}/dist/components"],
       "options": {
         "baseHref": "components",
         "outputPath": "apps/chrome-devtools/dist/components",
@@ -50,23 +50,6 @@
         },
         "buildOptimizer": true,
         "polyfills": "apps/chrome-devtools/src/polyfills.ts",
-        "assets": [
-          {
-            "glob": "**/*",
-            "input": "apps/chrome-devtools/src/assets",
-            "output": "/.."
-          },
-          {
-            "glob": "manifest.json",
-            "input": "apps/chrome-devtools/src",
-            "output": "/.."
-          },
-          {
-            "glob": "devtools.html",
-            "input": "apps/chrome-devtools/src",
-            "output": "/.."
-          }
-        ],
         "styles": [
           {
             "inject": true,
@@ -95,15 +78,11 @@
           "buildOptimizer": false
         }
       },
-      "dependsOn": [
-        "^build"
-      ]
+      "dependsOn": ["^build"]
     },
     "build-panel": {
-      "executor": "@angular-devkit/build-angular:browser",
-      "outputs": [
-        "{projectRoot}/dist/panel"
-      ],
+      "executor": "@angular-devkit/build-angular:browser-esbuild",
+      "outputs": ["{projectRoot}/dist/panel"],
       "options": {
         "baseHref": "panel",
         "outputPath": "apps/chrome-devtools/dist/panel",
@@ -126,23 +105,6 @@
         },
         "buildOptimizer": true,
         "polyfills": "apps/chrome-devtools/src/polyfills.ts",
-        "assets": [
-          {
-            "glob": "**/*",
-            "input": "apps/chrome-devtools/src/assets",
-            "output": "/.."
-          },
-          {
-            "glob": "manifest.json",
-            "input": "apps/chrome-devtools/src",
-            "output": "/.."
-          },
-          {
-            "glob": "devtools.html",
-            "input": "apps/chrome-devtools/src",
-            "output": "/.."
-          }
-        ],
         "styles": [
           {
             "inject": true,
@@ -171,49 +133,51 @@
           "buildOptimizer": false
         }
       },
-      "dependsOn": [
-        "^build"
-      ]
+      "dependsOn": ["^build"]
     },
     "build-extension": {
       "executor": "nx:run-script",
-      "outputs": [
-        "{projectRoot}/dist/extension"
-      ],
+      "outputs": ["{projectRoot}/dist/extension"],
       "options": {
         "script": "build:extension"
       },
-      "dependsOn": [
-        "^build"
-      ]
+      "dependsOn": ["^build"]
     },
     "lint": {
-      "executor": "@nrwl/linter:eslint",
-      "configurations": {
-        "ci": {
-          "quiet": true,
-          "cacheLocation": ".cache/eslint"
-        }
-      },
       "options": {
         "eslintConfig": "apps/chrome-devtools/.eslintrc.js",
         "lintFilePatterns": [
-          "apps/chrome-devtools/src/**/*.ts"
+          "apps/chrome-devtools/src/**/*.ts",
+          "apps/chrome-devtools/package.json"
         ]
       }
     },
     "test": {
-      "executor": "@nrwl/jest:jest",
+      "executor": "@nx/jest:jest",
       "options": {
-        "jestConfig": "apps/chrome-devtools/jest.config.js",
-        "silent": true
+        "jestConfig": "apps/chrome-devtools/jest.config.js"
       }
+    },
+    "copy-assets": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "copy:assets"
+      },
+      "outputs": [
+        "{projectRoot}/dist/assets/**",
+        "{projectRoot}/dist/manifest.json",
+        "{projectRoot}/dist/devtools.html"
+      ]
     },
     "prepare-publish": {
       "executor": "nx:run-script",
       "options": {
         "script": "prepare:publish"
-      }
+      },
+      "outputs": [
+        "{projectRoot}/dist/package.json",
+        "{projectRoot}/dist/manifest.json"
+      ]
     },
     "publish-extension": {
       "executor": "nx:run-script",

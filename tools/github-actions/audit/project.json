@@ -12,17 +12,11 @@
       }
     },
     "lint": {
-      "executor": "@nrwl/linter:eslint",
-      "configurations": {
-        "ci": {
-          "quiet": true,
-          "cacheLocation": ".cache/eslint"
-        }
-      },
       "options": {
         "eslintConfig": "tools/github-actions/audit/.eslintrc.js",
         "lintFilePatterns": [
-          "tools/github-actions/audit/src/main.ts"
+          "tools/github-actions/audit/src/**/*.ts",
+          "tools/github-actions/audit/package.json"
         ]
       }
     }

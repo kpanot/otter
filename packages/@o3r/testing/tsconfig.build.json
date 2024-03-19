@@ -8,7 +8,7 @@
     "types": [
       "node"
     ],
-    "rootDir": ".",
+    "rootDir": "./src",
     "inlineSources": true,
     "target": "ES5",
     "module": "CommonJS",
@@ -18,14 +18,14 @@
     "src/core/angular/**/*.ts",
     "src/core/protractor/**/*.ts",
     "src/core/playwright/**/*.ts",
+    "src/kassette/**/*.ts",
     "src/localization/**/*.ts",
     "src/mocks/**/*.ts",
     "src/store/**/*.ts",
     "src/tools/**/*.ts",
     "src/visual-test/**/*.ts",
     "src/errors/**/*.ts",
-    "src/public_api.ts",
-    "updates/**/*.ts",
+    "src/public_api.ts"
   ],
   "exclude": [
     "src/tools/protractor/*/_*.ts",

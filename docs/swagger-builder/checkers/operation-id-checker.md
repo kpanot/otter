@@ -1,11 +1,11 @@
 # Operation ID checker
 
-The purpose of the tool is to validate that Operation IDs are specified and unique for each paths.
+The purpose of the tool is to validate that Operation IDs are specified and unique for each path.
 
 ## Usage
 
-```bash
-$ swagger-operation-id-check --help
+```shell
+swagger-operation-id-check --help
 
 # Usage: swagger-operation-id-check [options] [(swagger-spec|api-configuration|npm-package|glob)...]
 

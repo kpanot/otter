@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/schema",
+  "$schema": "http://json-schema.org/draft-07/schema",
   "$id": "NgGenerateComponentSchematicsSchema",
   "title": "Generate Otter Component",
   "description": "ng generate Otter Component",
@@ -32,36 +32,29 @@
     "componentStructure": {
       "type": "string",
       "enum": [
+        "simple",
         "full",
         "container",
         "presenter"
       ],
-      "description": "Structure of the component you want to generate ('full' | 'container' | 'presenter')",
-      "default": "full",
-      "x-prompt": "Specify the structure of the component you want to generate"
+      "description": "Structure of the component you want to generate ('simple' | 'full' | 'container' | 'presenter')",
+      "default": "simple"
     },
     "useComponentFixtures": {
       "type": "boolean",
-      "description": "Generate component fixtures for tests",
-      "default": true,
-      "x-prompt": "Do you want to generate component fixtures for tests?"
+      "description": "Generate component fixtures for tests"
     },
     "useOtterTheming": {
       "type": "boolean",
-      "description": "Generate component with Otter theming architecture",
-      "default": true,
-      "x-prompt": "Do you want to generate your component with Otter theming architecture?"
+      "description": "Generate component with Otter theming architecture"
     },
     "useOtterConfig": {
       "type": "boolean",
-      "description": "Generate component with Otter configuration",
-      "default": true,
-      "x-prompt": "Generate component with Otter configuration?"
+      "description": "Generate component with Otter configuration"
     },
-    "useStorybook": {
+    "useRulesEngine": {
       "type": "boolean",
-      "description": "Generate component stories for storybook",
-      "default": true
+      "description": "Generate component with rules-engine"
     },
     "useLocalization": {
       "type": "boolean",
@@ -69,8 +62,7 @@
     },
     "useContext": {
       "type": "boolean",
-      "description": "Generate component context",
-      "default": true
+      "description": "Generate component context"
     },
     "description": {
       "type": "string",
@@ -80,16 +72,21 @@
     "skipLinter": {
       "type": "boolean",
       "description": "Skip the linter process",
-      "default": false,
-      "x-prompt": "Skip linter process on generated files?"
+      "default": false
     },
     "activateDummy": {
       "type": "boolean",
-      "description": "Generate dummy values"
+      "description": "Generate dummy values",
+      "default": false
     },
     "useOtterAnalytics": {
       "type": "boolean",
       "description": "Generate component with Otter analytics architecture"
+    },
+    "standalone": {
+      "type": "boolean",
+      "description": "Whether the generated component is standalone.",
+      "default": false
     }
   },
   "additionalProperties": true,

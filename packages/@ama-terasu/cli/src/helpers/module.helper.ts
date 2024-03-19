@@ -4,7 +4,10 @@ import { existsSync, promises as fs } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import type { PackageJson } from 'type-fest';
+import { getAvailableModules, NpmRegistryPackage } from '@o3r/schematics';
 import { dependencies, devDependencies, peerDependencies } from '../../package.json';
+
+const moduleScopeWhitelist = ['@o3r', '@ama-sdk', '@ama-des'];
 
 /** Minimal information of a package (common between package.json and npm search result) */
 export type MinimalPackageInformation = Pick<PackageJson, 'name' | 'description' | 'keywords' | 'maintainers' | 'version'>;
@@ -29,6 +32,9 @@ export interface ModuleLoadedInformation {
 
   /** Simplified name as displayed in the interface and selectable by the user */
   moduleName: string;
+
+  /** Determine if the package is officially supported by the Otter (and affiliated) Teams */
+  isOfficialModule: boolean;
 }
 
 /** Installed package information */
@@ -46,13 +52,16 @@ export type ModuleDiscovery = MinimalPackageInformation & ModuleLoadedInformatio
 /** Keyword to identify a module */
 export const MODULES_KEYWORD = 'amaterasu-module';
 
+/** List of official scopes of modules supported by Otter (and affiliated) Teams */
+export const OFFICIAL_MODULE_SCOPES = ['ama-terasu', 'ama-sdk', 'o3r', 'otter'] as const;
+const officialModuleScopeRegExps = OFFICIAL_MODULE_SCOPES.map((s) => new RegExp(`^@${s}/`));
+
 /** Folder containing the dependency installed dynamically */
 export const DYNAMIC_DEPENDENCIES_FOLDER = 'dyn_modules';
 const dynamicDependenciesPath = resolve(__dirname, '..', '..', DYNAMIC_DEPENDENCIES_FOLDER);
 
 /**
  * Find the closest package.json file in parent folders
- *
  * @param currentPath current path to inspect
  * @returns
  */
@@ -68,7 +77,6 @@ export const findClosestPackageJson = (currentPath: string): string | undefined 
 
 /**
  * Retrieve package.json from a dependency
- *
  * @param packageName Name of a dependency package
  * @returns the package information or undefined if not found
  */
@@ -83,14 +91,20 @@ export const getDepPackage = (packageName: string): PackageJson | undefined => {
 
 /**
  * Get the path to the installed package
- *
  * @param dep dependency to retrieve in the installed packages
+ * @param useFsToSearch Use File System access to search for the package instead of Node resolve mechanism
  */
-export const getInstalledInformation = async (dep: MinimalPackageInformation & { name: string }): Promise<InstalledModuleInformation | undefined> => {
+export const getInstalledInformation = async (dep: MinimalPackageInformation & { name: string }, useFsToSearch = false): Promise<InstalledModuleInformation | undefined> => {
+  const dynModule = resolve(dynamicDependenciesPath, 'node_modules');
   try {
-    const resolutionPath = require.resolve(dep.name, {
+    let fsDiscoveredPath: string | undefined;
+    if (useFsToSearch) {
+      const localPath = resolve(dynModule, dep.name, 'package.json');
+      fsDiscoveredPath = existsSync(localPath) ? resolve(dynModule, dep.name, JSON.parse(await fs.readFile(localPath, {encoding: 'utf-8'})).main) : undefined;
+    }
+    const resolutionPath = fsDiscoveredPath || require.resolve(dep.name, {
       paths: [
-        resolve(dynamicDependenciesPath, 'node_modules'),
+        dynModule,
         ...module.paths
       ]
     });
@@ -111,11 +125,18 @@ export const getInstalledInformation = async (dep: MinimalPackageInformation & {
 
 /**
  * Get the module simplified name
- *
  * @param pck package to get name from
  */
 export const getSimplifiedName = (pck: MinimalPackageInformation & { name: string }) => {
   return /(?:@[^/]+[/])?(?:amaterasu-)?(.*)/.exec(pck.name)?.[1] || pck.name;
+};
+
+/**
+ * Determine if the module is officially supported by Otter (or affiliated) teams
+ * @param pck package to get name from
+ */
+export const isOfficialModule = (pck: MinimalPackageInformation & { name: string }) => {
+  return officialModuleScopeRegExps.some((scope) => scope.test(pck.name));
 };
 
 /**
@@ -134,14 +155,12 @@ export const getLocalDependencies = async (): Promise<Record<string, string>> =>
 
 /**
  * Retrieve the list of modules registered to Amaterasu CLI
- *
  * @param options Options for the module resolution
  * @param options.localOnly Resolve module locally only
  * @returns list of modules to load
  */
 export const getCliModules = async (options: { localOnly: boolean } = { localOnly: false }): Promise<ModuleDiscovery[]> => {
-  let remoteModules: SearchResult[] = [];
-  const remoteModulesPromise = !options.localOnly && promisify(exec)(`npm search ${MODULES_KEYWORD} --json`);
+  let remoteModules: NpmRegistryPackage[] = [];
   const localDependencies = await getLocalDependencies();
   const explicitModules = Object.keys(localDependencies)
     .map((moduleName) => getDepPackage(moduleName))
@@ -150,9 +169,9 @@ export const getCliModules = async (options: { localOnly: boolean } = { localOnl
       return !!keywords && keywords.includes(MODULES_KEYWORD);
     });
 
-  if (remoteModulesPromise) {
+  if (!options.localOnly) {
     try {
-      remoteModules = JSON.parse((await remoteModulesPromise).stdout) as SearchResult[];
+      remoteModules = await getAvailableModules(MODULES_KEYWORD, moduleScopeWhitelist);
     } catch {
       console.warn('Failed to execute `npm search`, will contains only installed packages');
     }
@@ -164,7 +183,12 @@ export const getCliModules = async (options: { localOnly: boolean } = { localOnl
 
   for (const mod of modules) {
     const localInformation = await getInstalledInformation(mod);
-    map.set(mod.name, { ...mod, ...localInformation, moduleName: getSimplifiedName(mod) });
+    map.set(mod.name, {
+      ...mod,
+      ...localInformation,
+      moduleName: getSimplifiedName(mod),
+      isOfficialModule: isOfficialModule(mod)
+    });
   }
 
   return [ ...map.values() ];
@@ -172,7 +196,6 @@ export const getCliModules = async (options: { localOnly: boolean } = { localOnl
 
 /**
  * Determine if the package is installed
- *
  * @param pck package to get name from
  */
 export const isInstalled = (pck: ModuleDiscovery): pck is ModuleDiscovery & InstalledModuleInformation => {
@@ -181,16 +204,14 @@ export const isInstalled = (pck: ModuleDiscovery): pck is ModuleDiscovery & Inst
 
 /**
  * Formatted description
- *
  * @param pck package to get name from
  */
 export const getFormattedDescription = (pck: ModuleDiscovery): string => {
-  return (isInstalled(pck) ? '' : `${chalk.grey.italic('(remote)')} `) + (pck.description || '<Missing description>');
+  return (isInstalled(pck) ? '' : `${chalk.grey.italic('(remote)')} `) + (pck.description || '<Missing description>') + (pck.isOfficialModule ? ` ${chalk.blue(String.fromCharCode(0x00AE))}` : '');
 };
 
 /**
  * Install a specific package
- *
  * @param pck Package to install
  * @param version Version of the package to install
  */

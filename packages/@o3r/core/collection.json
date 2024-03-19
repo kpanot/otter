@@ -1,5 +1,5 @@
 {
-  "$schema": "https://raw.githubusercontent.com/angular/angular-cli/14.0.x/packages/angular_devkit/schematics/collection-schema.json",
+  "$schema": "https://raw.githubusercontent.com/angular/angular-cli/master/packages/angular_devkit/schematics/collection-schema.json",
   "schematics": {
     "ng-add": {
       "description": "Add Otter Library to the project.",
@@ -22,6 +22,12 @@
       "factory": "./schematics/component/index#ngGenerateComponent",
       "schema": "./schematics/component/schema.json"
     },
+    "context-to-component": {
+      "description": "Add Otter Context to an existing component",
+      "factory": "./schematics/context-to-component/index#ngAddContext",
+      "schema": "./schematics/context-to-component/schema.json",
+      "aliases": ["add-context"]
+    },
     "component-container": {
       "description": "Generate an Otter container component into the project.",
       "factory": "./schematics/component/container/index#ngGenerateComponentContainer",
@@ -31,11 +37,6 @@
       "description": "Generate an Otter presenter component into the project.",
       "factory": "./schematics/component/presenter/index#ngGenerateComponentPresenter",
       "schema": "./schematics/component/presenter/schema.json"
-    },
-    "fixture": {
-      "description": "Adding functions to an Otter fixture based on a selector and default methods",
-      "factory": "./schematics/fixture/index#ngAddFunctionsToFixture",
-      "schema": "./schematics/fixture/schema.json"
     },
     "service": {
       "description": "Generate an Otter service into the project.",
@@ -82,15 +83,26 @@
       "factory": "./schematics/renovate/index#ngGenerateRenovateBotComponent",
       "schema": "./schematics/renovate/schema.json"
     },
-    "storybook-component": {
-      "description": "Generate an storybook file in an existing component folder",
-      "factory": "./schematics/storybook/index#ngGenerateStorybookComponent",
-      "schema": "./schematics/storybook/schema.json"
+    "show-modules": {
+      "description": "Show available Otter modules",
+      "factory": "./schematics/show-modules/index#ngShowModules",
+      "schema": "./schematics/show-modules/schema.json",
+      "aliases": [
+        "list-modules"
+      ]
     },
-    "module": {
-      "description": "Generate an new Otter compatible module",
-      "factory": "./schematics/module/index#ngGenerateModule",
-      "schema": "./schematics/module/schema.json"
+    "add-modules": {
+      "description": "Add additional Otter module",
+      "factory": "./schematics/add-modules/index#ngAddModules",
+      "schema": "./schematics/add-modules/schema.json",
+      "aliases": [
+        "add-module"
+      ]
+    },
+    "convert-component": {
+      "description": "Convert an Angular component into an Otter component",
+      "factory": "./schematics/convert-component/index#convertToO3rComponent",
+      "schema": "./schematics/convert-component/schema.json"
     }
   }
 }

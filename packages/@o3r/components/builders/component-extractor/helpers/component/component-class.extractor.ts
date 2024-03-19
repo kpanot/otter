@@ -1,5 +1,8 @@
 import { logging } from '@angular-devkit/core';
 import type { ComponentStructure } from '@o3r/components';
+import { getLocalizationFileFromAngularElement } from '@o3r/extractors';
+import { isO3rClassComponent } from '@o3r/schematics';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as ts from 'typescript';
 
@@ -21,10 +24,10 @@ export interface ComponentInformation {
   type: ComponentStructure;
   /** Selector of the component */
   selector?: string;
-  /** Template URL of the component */
-  templateUrl?: string;
   /** Determine if the component is activating a ruleset */
   linkableToRuleset: boolean;
+  /** List of localization keys used in the component */
+  localizationKeys?: string[];
 }
 
 /**
@@ -87,21 +90,22 @@ export class ComponentClassExtractor {
   }
 
   /**
-   * Get the component template URL from the given decorator node.
+   * Sanitize component type by removing extra quotes
+   * Example: "'Page'" becomes 'Page'
    *
-   * @param decoratorNode The decorator node to get the component template URL from
+   * @param type
+   * @private
    */
-  private getComponentTemplateUrl(decoratorNode: ts.Decorator) {
-    if (this.isComponentDecorator(decoratorNode)) {
-      const matches = /templateUrl:\s*['"](.*)['"]/.exec(decoratorNode.getText(this.source));
-      if (matches) {
-        return matches[1];
-      }
+  private sanitizeComponentType(type: string | undefined) {
+    if (!type) {
+      return;
     }
+    return type.replaceAll(/['"]/g, '');
   }
 
   private getComponentStructure(type: string | undefined): ComponentStructure {
-    switch (type) {
+    const sanitizedType = this.sanitizeComponentType(type);
+    switch (sanitizedType) {
       case 'Block':
         return 'BLOCK';
       case 'Page':
@@ -126,7 +130,6 @@ export class ComponentClassExtractor {
     let isDynamic = false;
     let type: ComponentStructure = 'COMPONENT';
     let selector: string | undefined;
-    let templateUrl: string | undefined;
     let linkableToRuleset = false;
 
     classNode.forEachChild((node) => {
@@ -141,12 +144,6 @@ export class ComponentClassExtractor {
             contextName = interfaceValue;
           } else {
             switch (interfaceValue) {
-              case 'Block':
-              case 'Page':
-              case 'ExposedComponent':
-                type = this.getComponentStructure(interfaceValue);
-                this.logger.warn(`Interface ${interfaceValue} is deprecated, you should use the @O3rComponent decorator`);
-                break;
               case 'LinkableToRuleset':
                 linkableToRuleset = true;
                 break;
@@ -155,7 +152,6 @@ export class ComponentClassExtractor {
         });
       } else if (ts.isDecorator(node)) {
         selector = this.getComponentSelector(node);
-        templateUrl = this.getComponentTemplateUrl(node);
         type = this.getComponentType(node) || type;
       } else if (ts.isIdentifier(node)) {
         name = node.getText(this.source);
@@ -168,7 +164,18 @@ export class ComponentClassExtractor {
       this.logger.debug(`${name!} is ignored because it is not a configurable component`);
     }
 
-    return name && type ? { name, configName, contextName, isDynamicConfig: isDynamic, type, selector, templateUrl, linkableToRuleset } : undefined;
+    const localizationFiles = getLocalizationFileFromAngularElement(classNode);
+
+    const localizationKeys = (localizationFiles || []).reduce((acc: string[], file) => {
+      const resolvedFilePath = path.resolve(path.dirname(this.filePath), file);
+      const data = JSON.parse(fs.readFileSync(resolvedFilePath, 'utf-8'));
+      return acc.concat(Object.keys(data));
+    }, []);
+
+    return name && type ? {
+      name, configName, contextName, isDynamicConfig: isDynamic, type, selector, linkableToRuleset,
+      ...(localizationKeys.length ? { localizationKeys } : {})
+    } : undefined;
   }
 
   /**
@@ -207,7 +214,7 @@ export class ComponentClassExtractor {
     let componentInfo: ComponentInformation | undefined;
 
     this.source.forEachChild((node) => {
-      if (!componentInfo && ts.isClassDeclaration(node)) {
+      if (!componentInfo && ts.isClassDeclaration(node) && isO3rClassComponent(node)) {
         componentInfo = this.getComponentInformation(node);
       }
     });

@@ -1,5 +1,5 @@
 {
-  "$schema": "http://json-schema.org/schema",
+  "$schema": "http://json-schema.org/draft-07/schema",
   "$id": "ngAddSchematicsSchema",
   "title": "Add Otter components ",
   "description": "ngAdd Otter components ",
@@ -10,9 +10,19 @@
       "$default": {
         "$source": "projectName"
       }
+    },
+    "enableMetadataExtract": {
+      "type": "boolean",
+      "default": false,
+      "description": "Activate metadata extraction"
+    },
+    "exactO3rVersion": {
+      "type": "boolean",
+      "description": "Use a pinned version for otter packages",
+      "default": false
     }
   },
-  "additionalProperties": false,
+  "additionalProperties": true,
   "required": [
   ]
 }

@@ -1,4 +1,4 @@
-import type { CategoryDescription, Output } from '@o3r/core';
+import type { CategoryDescription, ConfigPropertyWidget, Output } from '@o3r/core';
 
 /** Types of components config */
 export type ConfigType = 'Block' | 'Page' | 'AppRuntimeConfiguration' | 'AppBuildConfiguration' | 'ExposedComponent';
@@ -50,12 +50,6 @@ export interface ComponentClassOutput extends Output {
   name: string;
   /** Component path */
   path: string;
-  /** Component template path */
-  templatePath: string;
-  /** Name of the module that declares this component */
-  moduleName: string;
-  /** Path where the module can be found */
-  modulePath: string;
   /** Component selector */
   selector: string;
   /** Component type */
@@ -68,16 +62,8 @@ export interface ComponentClassOutput extends Output {
   placeholders?: PlaceholderData[];
   /** Determine if the component is activating a ruleset */
   linkableToRuleset: boolean;
-}
-
-/**
- * Output generated for component module metadata
- */
-export interface ComponentModuleOutput extends Output {
-  /** Module name */
-  name: string;
-  /** Module path */
-  path: string;
+  /** List of localization keys used in the component */
+  localizationKeys?: string[];
 }
 
 /** Property types */
@@ -111,6 +97,10 @@ export interface ConfigProperty {
   choices?: string[];
   /** The category of the config property */
   category?: string;
+  /** The CMS widget information */
+  widget?: ConfigPropertyWidget;
+  /** If true, the CMS user must specify a value for the property */
+  required?: boolean;
 }
 
 /**
@@ -131,7 +121,7 @@ export interface ComponentConfigOutput extends Output {
   tags?: string[];
   /** Configuration fields */
   properties: ConfigProperty[];
-  /** Category (taken from <o3rCategories> tag) */
+  /** Category (taken from @o3rCategories tag) */
   categories?: CategoryDescription[];
 }
 

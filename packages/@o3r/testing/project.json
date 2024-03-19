@@ -7,25 +7,19 @@
   "targets": {
     "build": {
       "executor": "nx:run-script",
-      "outputs": [
-        "{projectRoot}/dist/package.json"
-      ],
+      "outputs": ["{projectRoot}/dist/package.json"],
       "options": {
         "script": "postbuild"
       },
-      "dependsOn": [
-        "compile",
-        "build-schematics",
-        "build-tools"
-      ]
+      "dependsOn": ["compile", "build-schematics", "build-tools"]
     },
     "compile": {
-      "executor": "@nrwl/js:tsc",
+      "executor": "@nx/js:tsc",
       "options": {
+        "rootDir": "packages/@o3r/testing/src",
         "main": "packages/@o3r/testing/src/public_api.ts",
         "tsConfig": "packages/@o3r/testing/tsconfig.build.json",
         "outputPath": "packages/@o3r/testing/dist",
-        "updateBuildableProjectDepsInPackageJson": false,
         "clean": false
       }
     },
@@ -37,52 +31,40 @@
     },
     "build-schematics": {
       "executor": "nx:run-script",
-      "dependsOn": [
-        "^build",
-        "compile",
-        "prepare-build-builders"
-      ],
+      "dependsOn": ["^build", "compile", "prepare-build-builders"],
       "options": {
         "script": "build:schematics"
       },
       "inputs": ["schematics", "^source"],
-      "outputs": [
-        "{projectRoot}/dist/schematics"
-      ]
+      "outputs": ["{projectRoot}/dist/schematics"]
     },
     "build-tools": {
       "executor": "nx:run-script",
-      "outputs": [
-        "{projectRoot}/dist/src/tools/protractor"
-      ],
+      "outputs": ["{projectRoot}/dist/src/tools/protractor"],
       "options": {
         "script": "build:tools"
       },
-      "dependsOn": [
-        "^build",
-        "compile"
-      ]
+      "dependsOn": ["^build", "compile"]
     },
     "lint": {
-      "executor": "@nrwl/linter:eslint",
-      "configurations": {
-        "ci": {
-          "quiet": true,
-          "cacheLocation": ".cache/eslint"
-        }
-      },
       "options": {
         "eslintConfig": "packages/@o3r/testing/.eslintrc.js",
         "lintFilePatterns": [
-          "packages/@o3r/testing/src/**/*.ts"
+          "packages/@o3r/testing/src/**/*.ts",
+          "packages/@o3r/testing/package.json"
         ]
       }
     },
     "test": {
-      "executor": "@nrwl/jest:jest",
+      "executor": "@nx/jest:jest",
       "options": {
-        "jestConfig": "packages/@o3r/testing/jest.config.js",
-        "silent": true
+        "jestConfig": "packages/@o3r/testing/jest.config.js"
+      }
+    },
+    "test-int": {
+      "executor": "@nx/jest:jest",
+      "options": {
+        "jestConfig": "packages/@o3r/testing/testing/jest.config.it.js"
       }
     },
     "prepare-publish": {
@@ -95,6 +77,12 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "npm publish packages/@o3r/testing/dist"
+      }
+    },
+    "documentation": {
+      "executor": "nx:run-script",
+      "options": {
+        "script": "compodoc"
       }
     }
   },

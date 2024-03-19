@@ -6,6 +6,11 @@ import type {
   SchematicOptions
 } from '@angular/cli/lib/config/workspace-schema';
 
+/**
+ * Type representing supported testing frameworks: 'jest' or 'jasmine'.
+ */
+export type AvailableTestFrameworks = 'jest' | 'jasmine';
+
 export interface WorkspaceProjectI18n {
   locales: Record<string, string>;
   sourceLocale?: string;
@@ -14,45 +19,39 @@ export interface WorkspaceTool {
   [k: string]: any;
 }
 
-export interface WorkspaceSchematics extends SchematicOptions {
-  /** @deprecated */
-  '@otter/ng-tools:api-service'?: {
-    path: string;
-  };
-  /** @deprecated */
-  '@otter/ng-tools:component'?: {
-    path: string;
-    useStorybook: boolean;
-  };
-  /** @deprecated */
-  '@otter/ng-tools:service'?: {
-    path: string;
-  };
-  /** @deprecated */
-  '@otter/ng-tools:store'?: {
-    path: string;
-  };
-  /** @deprecated */
-  '@otter/ng-tools:schematics'?: {
-    path: string;
-  };
+/** Defines the directories where the apps/libs will stay inside a monorepo */
+export interface WorkspaceLayout {
+  /** Libraries directory name */
+  libsDir: string;
+  /** Applications directory name */
+  appsDir: string;
+}
 
-  '@o3r/components:component'?: {
+
+export interface WorkspaceSchematics extends SchematicOptions {
+  '@o3r/core:component'?: {
     path: string;
-    useStorybook: boolean;
-  };
-  '@o3r/services:service'?: {
+  } & WorkspaceSchematics['*:*'];
+  '@o3r/core:service'?: {
     path: string;
-  };
-  '@o3r/store:store'?: {
+  } & WorkspaceSchematics['*:*'];
+  '@o3r/core:store'?: {
     path: string;
-  };
+  } & WorkspaceSchematics['*:*'];
   '@o3r/core:schematics'?: {
     path: string;
+  } & WorkspaceSchematics['*:*'];
+  '*:ng-add'?: {
+    enableMetadataExtract?: boolean;
+    registerDevtool?: boolean;
+  } & WorkspaceSchematics['*:*'];
+  '*:*'?: WorkspaceLayout & {
+    /** in addition to the WorkspaceLayout, an optional testFramework attribute is available */
+    testFramework?: AvailableTestFrameworks;
   };
-
 }
 export interface WorkspaceProject extends NgWorkspaceProject {
+  name?: string;
   architect?: WorkspaceTool;
   i18n?: WorkspaceProjectI18n;
   prefix: string;
@@ -65,7 +64,7 @@ export interface WorkspaceProject extends NgWorkspaceProject {
 
 export interface WorkspaceSchema extends NgWorkspaceSchema {
   projects: {
-      [k: string]: WorkspaceProject;
+    [k: string]: WorkspaceProject;
   };
   schematics?: WorkspaceSchematics;
 }

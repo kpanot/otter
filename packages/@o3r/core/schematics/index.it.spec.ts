@@ -1,145 +1,155 @@
-import { execSync, ExecSyncOptions, spawn } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  addImportToAppModule,
+  getDefaultExecSyncOptions,
+  getGitDiff,
+  packageManagerExec,
+  packageManagerExecOnProject,
+  packageManagerInstall,
+  packageManagerRunOnProject,
+  prepareTestEnv,
+  setupLocalRegistry
+} from '@o3r/test-helpers';
 import * as path from 'node:path';
-import type { PackageJson } from 'nx/src/utils/package-json';
+import { execSync, spawn } from 'node:child_process';
 import getPidFromPort from 'pid-from-port';
-import { minVersion } from 'semver';
+import { rm } from 'node:fs/promises';
 
 const devServerPort = 4200;
-const currentFolder = path.join(__dirname, '..', '..', '..', '..');
-const verdaccioFolder = path.join(currentFolder, '.verdaccio', 'conf');
-const packageJsonPath = path.join(__dirname, '..', 'package.json');
-const applicationPath = path.join(currentFolder, '..');
-const tmpAppFolderPath = path.join(applicationPath, 'test-app');
-const execAppOptions: ExecSyncOptions = {
-  cwd: tmpAppFolderPath,
-  stdio: 'inherit',
-  // eslint-disable-next-line @typescript-eslint/naming-convention
-  env: {...process.env, JEST_WORKER_ID: undefined, NODE_OPTIONS: ''}
-};
-const registry = 'http://localhost:4873';
-const configFile = path.join(verdaccioFolder, '.npmrc');
-
-/**
- * @param moduleName
- * @param modulePath
- */
-function addImportToAppModule(moduleName: string, modulePath: string) {
-  const appModuleFilePath = path.join(tmpAppFolderPath, 'src/app/app.module.ts');
-  const appModule = readFileSync(appModuleFilePath).toString();
-  writeFileSync(appModuleFilePath, `import { ${moduleName} } from '${modulePath}';\n${
-    appModule.replace(/(BrowserModule,)/, `$1\n    ${moduleName},`)
-  }`);
-}
-
-/**
- * Set up a local npm registry inside a docker image before the tests.
- * Publish all the packages of the Otter monorepo on it.
- * Can be accessed during the tests with url http://localhost:4873
- */
-function setupLocalRegistry() {
-  let containerId: string;
-
-  beforeAll(() => {
-    containerId = execSync(`docker run -d -it --rm --name verdaccio -p 4873:4873 -v ${verdaccioFolder}:/verdaccio/conf verdaccio/verdaccio`, {cwd: currentFolder, stdio: 'pipe'}).toString();
-    execSync(`echo registry=${registry} > .npmrc`, {cwd: verdaccioFolder, stdio: 'inherit'});
-    execSync('yarn set:version 999.0.0 --include "!**/!(dist)/package.json" --include !package.json', {cwd: currentFolder, stdio: 'inherit', env: process.env});
-    execSync(`npx --yes wait-on ${registry}`, {cwd: currentFolder, stdio: 'inherit'});
-    execSync(`npx --yes npm-cli-login -u verdaccio -p verdaccio -e test@test.com -r ${registry} --config-path "${configFile}"`, {cwd: currentFolder, stdio: 'inherit'});
-    execSync(`yarn run publish --userconfig "${configFile}" --tag=latest --@o3r:registry=${registry} --@ama-sdk:registry=${registry}`,
-      {cwd: currentFolder, stdio: 'inherit', env: process.env});
-  });
-
-  afterAll(() => {
-    if (containerId) {
-      execSync(`docker container stop ${containerId}`, {cwd: currentFolder, stdio: 'inherit'});
-    }
-  });
-}
-
-/**
- * Setup a new application using Angular CLI
- */
-function setupNewApp() {
-  beforeAll(() => {
-    const packageJson = JSON.parse(readFileSync(packageJsonPath).toString()) as PackageJson;
-    const angularVersion = minVersion(packageJson.devDependencies['@angular/core']).version;
-
-    // Create app with ng new
-    execSync('npx rimraf test-app', {cwd: applicationPath, stdio: 'inherit'});
-    execSync(`npx --yes -p @angular/cli@${angularVersion} ng new test-app --style=scss --routing --interactive=false --skip-git --package-manager=yarn --skip-install`,
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-      {cwd: applicationPath, stdio: 'inherit', env: {...process.env, NODE_OPTIONS: ''}});
-
-    // Set config to target local registry
-    execSync(`npm config set @o3r:registry ${registry} -L project`, execAppOptions);
-    execSync(`npm config set @ama-sdk:registry ${registry} -L project`, execAppOptions);
-    execSync('yarn config set enableStrictSsl false', execAppOptions);
-    execSync(`yarn config set npmScopes.o3r.npmRegistryServer ${registry}`, execAppOptions);
-    execSync('yarn config set unsafeHttpWhitelist localhost', execAppOptions);
-    execSync('yarn set version 1.22.19', execAppOptions);
-    execSync('yarn', execAppOptions);
-
-    // Run ng add
-    execSync(`yarn ng add @angular/pwa@${angularVersion} --skip-confirmation --interactive=false`, execAppOptions);
-    execSync(`yarn ng add @angular/material@${angularVersion} --skip-confirmation --interactive=false`, execAppOptions);
-  });
-}
-
-describe('new Otter application', () => {
+const appFolder = 'test-app-core';
+const o3rVersion = '999.0.0';
+const execAppOptions = getDefaultExecSyncOptions();
+let projectPath: string;
+let workspacePath: string;
+let projectName: string;
+let isInWorkspace: boolean;
+let untouchedProjectPath: undefined | string;
+describe('new otter application', () => {
   setupLocalRegistry();
-  setupNewApp();
+  beforeAll(async () => {
+    ({ projectPath, workspacePath, projectName, isInWorkspace, untouchedProjectPath } = await prepareTestEnv(appFolder));
+    execAppOptions.cwd = workspacePath;
+  });
+  test('should build empty app', async () => {
+    const relativeProjectPath = path.relative(workspacePath, projectPath);
+    const projectNameOptions = ['--project-name', projectName];
+    packageManagerExec({script: 'ng', args: ['add', `@o3r/core@${o3rVersion}`, '--preset', 'all', ...projectNameOptions, '--skip-confirmation']}, execAppOptions);
+    expect(() => packageManagerInstall(execAppOptions)).not.toThrow();
 
-  test('should build empty app', () => {
-    execSync(`yarn ng add @ama-sdk/core --skip-confirmation --interactive=false --registry ${registry} --verbose`, execAppOptions);
-    execSync(`yarn ng add @o3r/dynamic-content --skip-confirmation --interactive=false --registry ${registry} --verbose`, execAppOptions);
-    execSync(`yarn ng add @o3r/extractors --skip-confirmation --interactive=false --registry ${registry} --verbose`, execAppOptions);
-    execSync(`yarn ng add @o3r/core --skip-confirmation --interactive=false --registry ${registry} --verbose`, execAppOptions);
-    expect(() => execSync('yarn build', execAppOptions)).not.toThrow();
+    packageManagerExec({script: 'ng', args: ['g', '@o3r/core:store-entity-async', '--store-name', 'test-entity-async', '--model-name', 'Bound', '--model-id-prop-name', 'id', ...projectNameOptions]},
+      execAppOptions
+    );
+    await addImportToAppModule(projectPath, 'TestEntityAsyncStoreModule', 'src/store/test-entity-async');
 
-    execSync('yarn ng g @o3r/core:store-entity-async --interactive=false --store-name="test-entity-async" --model-name="Bound" --model-id-prop-name="id"', execAppOptions);
-    addImportToAppModule('TestEntityAsyncStoreModule', 'src/store/test-entity-async');
+    packageManagerExec({script: 'ng', args: ['g', '@o3r/core:store-entity-sync', '--store-name', 'test-entity-sync', '--model-name', 'Bound', '--model-id-prop-name', 'id', ...projectNameOptions]},
+      execAppOptions
+    );
+    await addImportToAppModule(projectPath, 'TestEntitySyncStoreModule', 'src/store/test-entity-sync');
 
-    execSync('yarn ng g @o3r/core:store-entity-sync --interactive=false --store-name="test-entity-sync" --model-name="Bound" --model-id-prop-name="id"', execAppOptions);
-    addImportToAppModule('TestEntitySyncStoreModule', 'src/store/test-entity-sync');
+    packageManagerExec({script: 'ng', args: ['g', '@o3r/core:store-simple-async', '--store-name', 'test-simple-async', '--model-name', 'Bound', ...projectNameOptions]},
+      execAppOptions
+    );
+    await addImportToAppModule(projectPath, 'TestSimpleAsyncStoreModule', 'src/store/test-simple-async');
 
-    execSync('yarn ng g @o3r/core:store-simple-async --interactive=false --store-name="test-simple-async" --model-name="Bound"', execAppOptions);
-    addImportToAppModule('TestSimpleAsyncStoreModule', 'src/store/test-simple-async');
+    packageManagerExec({script: 'ng', args: ['g', '@o3r/core:store-simple-sync', '--store-name', 'test-simple-sync', ...projectNameOptions]},
+      execAppOptions
+    );
+    await addImportToAppModule(projectPath, 'TestSimpleSyncStoreModule', 'src/store/test-simple-sync');
 
-    execSync('yarn ng g @o3r/core:store-simple-sync --interactive=false --store-name="test-simple-sync"', execAppOptions);
-    addImportToAppModule('TestSimpleSyncStoreModule', 'src/store/test-simple-sync');
+    packageManagerExec({script: 'ng', args: ['g', '@o3r/core:service', 'test-service', '--feature-name', 'base', ...projectNameOptions]},
+      execAppOptions
+    );
+    await addImportToAppModule(projectPath, 'TestServiceBaseModule', 'src/services/test-service');
 
-    execSync('yarn ng g @o3r/core:service --interactive=false test-service --feature-name="base"', execAppOptions);
-    addImportToAppModule('TestServiceBaseModule', 'src/services/test-service');
+    packageManagerExec({script: 'ng', args: ['g', '@o3r/core:page', 'test-page', '--app-routing-module-path', 'apps/test-app/src/app/app-routing.module.ts', ...projectNameOptions]},
+      execAppOptions
+    );
 
-    execSync('yarn ng g @o3r/core:page --interactive=false test-page --app-routing-module-path="src/app/app-routing.module.ts"', execAppOptions);
+    const defaultOptions = [
+      '--activate-dummy',
+      '--use-otter-config', 'false',
+      '--use-otter-theming', 'false',
+      '--use-otter-analytics', 'false',
+      '--use-localization', 'false',
+      '--use-context', 'false',
+      '--use-rules-engine', 'false'
+    ];
+    packageManagerExec({script: 'ng', args: ['g', '@o3r/core:component', 'test-component', ...defaultOptions, ...projectNameOptions]},
+      execAppOptions
+    );
+    await addImportToAppModule(projectPath, 'TestComponentModule', 'src/components/test-component');
 
-    execSync('yarn ng g @o3r/core:component --interactive=false test-component --activate-dummy', execAppOptions);
-    addImportToAppModule('TestComponentContModule', 'src/components/test-component');
+    const advancedOptions = [
+      '--activate-dummy',
+      '--use-otter-config', 'true',
+      '--use-otter-theming', 'true',
+      '--use-otter-analytics', 'true',
+      '--use-localization', 'true',
+      '--use-context', 'true',
+      '--use-rules-engine', 'true'
+    ];
+    packageManagerExec({script: 'ng', args: ['g', '@o3r/core:component', 'test-component-advanced', ...advancedOptions, ...projectNameOptions]},
+      execAppOptions
+    );
+    await addImportToAppModule(projectPath, 'TestComponentAdvancedModule', 'src/components/test-component-advanced');
 
-    expect(() => execSync('yarn build', execAppOptions)).not.toThrow();
+    packageManagerExec({script: 'ng', args: ['g', '@o3r/core:component', 'test-add-context-component', ...defaultOptions, ...projectNameOptions]},
+      execAppOptions
+    );
+    packageManagerExec({script: 'ng', args: ['g', '@o3r/core:add-context', '--path', 'apps/test-app/src/components/test-add-context-component/test-add-context-component.component.ts']},
+      execAppOptions
+    );
+    await addImportToAppModule(projectPath, 'TestAddContextComponentModule', 'src/components/test-add-context-component');
+
+    packageManagerExec({script: 'ng', args: ['g', '@schematics/angular:component', 'test-ng-component', '--project', projectName]},
+      execAppOptions
+    );
+    packageManagerExec({script: 'ng', args: ['g', '@o3r/core:convert-component', '--path', 'apps/test-app/src/app/test-ng-component/test-ng-component.component.ts']},
+      execAppOptions
+    );
+
+    packageManagerExec({script: 'ng', args: ['g', '@o3r/testing:playwright-scenario', '--name', 'test-scenario', ...projectNameOptions]}, execAppOptions);
+    packageManagerExec({script: 'ng', args: ['g', '@o3r/testing:playwright-sanity', '--name', 'test-sanity', ...projectNameOptions]}, execAppOptions);
+
+    const diff = getGitDiff(execAppOptions.cwd as string);
+
+    if (untouchedProjectPath) {
+      const relativeUntouchedProjectPath = path.relative(workspacePath, untouchedProjectPath);
+      expect(diff.all.filter((file) => new RegExp(relativeUntouchedProjectPath.replace(/[\\/]+/g, '[\\\\/]')).test(file)).length).toBe(0);
+    }
+
+    // Expect created files inside `test-app` project
+    expect(diff.added.filter((file) => new RegExp(path.join(relativeProjectPath, 'e2e-playwright').replace(/[\\/]+/g, '[\\\\/]')).test(file)).length).toBeGreaterThan(0);
+    expect(diff.added.filter((file) => new RegExp(path.join(relativeProjectPath, 'src/app').replace(/[\\/]+/g, '[\\\\/]')).test(file)).length).toBeGreaterThan(0);
+    expect(diff.added.filter((file) => new RegExp(path.join(relativeProjectPath, 'src/components').replace(/[\\/]+/g, '[\\\\/]')).test(file)).length).toBeGreaterThan(0);
+
+    expect(diff.added.filter((file) => new RegExp(path.join(relativeProjectPath, 'src/services').replace(/[\\/]+/g, '[\\\\/]')).test(file)).length).toBeGreaterThan(0);
+    expect(diff.added.filter((file) => new RegExp(path.join(relativeProjectPath, 'src/store').replace(/[\\/]+/g, '[\\\\/]')).test(file)).length).toBeGreaterThan(0);
+    expect(diff.added.filter((file) => new RegExp(path.join(relativeProjectPath, 'src/styling').replace(/[\\/]+/g, '[\\\\/]')).test(file)).length).toBeGreaterThan(0);
+
+    expect(() => packageManagerRunOnProject(projectName, isInWorkspace, {script: 'build'}, execAppOptions)).not.toThrow();
 
     // should pass the e2e tests
-    execSync('yarn ng g @o3r/testing:playwright-scenario --interactive=false --name=test-scenario', execAppOptions);
-    execSync('yarn ng g @o3r/testing:playwright-sanity --interactive=false --name=test-sanity', execAppOptions);
-    spawn(`npx http-server -p ${devServerPort} ./dist`, [], {
+    spawn(`npx http-server -p ${devServerPort} ${path.join(relativeProjectPath, 'dist/browser')}`, [], {
       ...execAppOptions,
       shell: true,
       stdio: ['ignore', 'ignore', 'inherit']
     });
-    execSync(`npx --yes wait-on http://127.0.0.1:${devServerPort} -t 10000`, execAppOptions);
+    execSync(`npx --yes wait-on http://127.0.0.1:${devServerPort} -t 20000`, execAppOptions);
 
-    // Don't run on Webkit to speed up the test by not installing necessary libs
-    expect(() => execSync('yarn test:playwright --project Chromium Firefox', execAppOptions)).not.toThrow();
-    expect(() => execSync('yarn test:playwright:sanity --project Chromium Firefox', execAppOptions)).not.toThrow();
+    packageManagerExecOnProject(projectName, isInWorkspace, {script: 'playwright', args: ['install', '--with-deps']}, execAppOptions);
+    expect(() => packageManagerRunOnProject(projectName, isInWorkspace, {script: 'test:playwright'}, execAppOptions)).not.toThrow();
+    expect(() => packageManagerRunOnProject(projectName, isInWorkspace, {script: 'test:playwright:sanity'}, execAppOptions)).not.toThrow();
   });
 
   afterAll(async () => {
     try {
       const pid = await getPidFromPort(devServerPort);
-      execSync(process.platform === 'win32' ? `taskkill /f /t /pid ${pid}` : `kill -15 ${pid}`, {stdio: 'inherit'});
+      execSync(process.platform === 'win32' ? `taskkill /f /t /pid ${pid}` : `kill -15 ${pid}`, { stdio: 'inherit' });
     } catch (e) {
       // http-server already off
     }
+  });
+  afterAll(async () => {
+      try { await rm(workspacePath, { recursive: true }); } catch { /* ignore error */ }
   });
 });

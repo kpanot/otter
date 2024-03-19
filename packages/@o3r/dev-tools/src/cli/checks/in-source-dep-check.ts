@@ -20,20 +20,22 @@ const dependencyTypes = ['dependencies', 'devDependencies', 'peerDependencies'];
 // eslint-disable-next-line no-underscore-dangle
 const nodeWellKnownModules = require('node:repl')._builtinLibs;
 program
-  .description('Checks that the dependencies imported in the code are declared in the package.json file')
+  .description('[DEPRECATED] Checks that the dependencies imported in the code are declared in the package.json file')
   .option<string>('--root <directory>', 'Project root directory', (p) => resolve(process.cwd(), p), process.cwd())
   // eslint-disable-next-line max-len
   .option<string[]>('--ignore <...patterns>', 'Path patters to ignore', (p, previous) => ([...previous, ...p.split(',')]), ['**/node_modules/**', '**/dist/**', '**/dist-*/**', '**/mocks/**', '**/templates/**', '**/*.template'])
   .option('--ignore-workspace', 'Ignore the workspace and only check from the root directory')
+  .option('--fail-on-error', 'Return a non-null status in case of dependency issue found')
   .parse(process.argv);
 
-const {root, ignore, ignoreWorkspace} = program.opts();
+const {root, ignore, ignoreWorkspace, failOnError} = program.opts();
 
 const packagePatterns: string[] = ignoreWorkspace ?
   join(root, 'package.json').replace(/\\/g, '/') :
   (require(join(root, 'package.json')).workspaces?.map((p: string) => join(p, 'package.json').replace(/\\/g, '/')) || []);
 
 void (async () => {
+  logger.warn('This script is deprecated, will be removed in Otter v12');
   const packageFiles = await glob(packagePatterns, { absolute: true});
   let fixFound = false;
 
@@ -108,5 +110,7 @@ void (async () => {
 
   if (!fixFound) {
     logger.info('No missing package.json dependencies found');
+  } else if (failOnError) {
+    process.exit(1);
   }
 })();

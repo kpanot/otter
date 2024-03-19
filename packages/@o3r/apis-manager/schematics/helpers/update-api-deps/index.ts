@@ -1,30 +1,33 @@
 import { chain, Rule, SchematicContext, Tree } from '@angular-devkit/schematics';
-import { getAppModuleFilePath, getProjectFromTree } from '@o3r/schematics';
-import * as ts from '@schematics/angular/third_party/github.com/Microsoft/TypeScript/lib/typescript';
 import {
-  addImportToModule,
-  addProviderToModule,
-  getDecoratorMetadata,
-  insertImport,
-  isImported
-} from '@schematics/angular/utility/ast-utils';
-import { InsertChange } from '@schematics/angular/utility/change';
-import * as commentJson from 'comment-json';
+  getAppModuleFilePath,
+  getModuleIndex,
+  getWorkspaceConfig,
+  insertBeforeModule as o3rInsertBeforeModule,
+  insertImportToModuleFile as o3rInsertImportToModuleFile
+} from '@o3r/schematics';
+import { isImported } from '@schematics/angular/utility/ast-utils';
+import { addRootImport, addRootProvider } from '@schematics/angular/utility';
+import * as ts from 'typescript';
 
 /**
  * Update app.module file with api manager, if needed
+ * @param options
+ * @param options.projectName
  */
-export function updateApiDependencies(): Rule {
+export function updateApiDependencies(options: {projectName?: string | undefined}): Rule {
 
   const updateAppModule: Rule = (tree: Tree, context: SchematicContext) => {
-    const moduleFilePath = getAppModuleFilePath(tree, context);
+    const additionalRules: Rule[] = [];
+    const moduleFilePath = getAppModuleFilePath(tree, context, options.projectName);
     if (!moduleFilePath) {
       return tree;
     }
+    const sourceFileContent = tree.readText(moduleFilePath);
 
     const sourceFile = ts.createSourceFile(
       moduleFilePath,
-      tree.read(moduleFilePath)!.toString(),
+      sourceFileContent,
       ts.ScriptTarget.ES2015,
       true
     );
@@ -34,80 +37,30 @@ export function updateApiDependencies(): Rule {
     }
 
     const recorder = tree.beginUpdate(moduleFilePath);
-    const ngModulesMetadata = getDecoratorMetadata(sourceFile, 'NgModule', '@angular/core');
-    const appModuleFile = tree.read(moduleFilePath)!.toString();
-    const moduleIndex = ngModulesMetadata[0] ? ngModulesMetadata[0].pos - ('NgModule'.length + 1) : appModuleFile.indexOf('@NgModule');
+    const { moduleIndex } = getModuleIndex(sourceFile, sourceFileContent);
 
-    /**
-     * Insert import on top of the main module file
-     *
-     * @param name
-     * @param file
-     * @param isDefault
-     */
-    const insertImportToModuleFile = (name: string, file: string, isDefault?: boolean) => {
-      const importChange = insertImport(sourceFile, moduleFilePath, name, file, isDefault);
-      if (importChange instanceof InsertChange) {
-        recorder.insertLeft(importChange.pos, importChange.toAdd);
-      }
-    };
+    const addImportToModuleFile = (name: string, file: string, moduleFunction?: string) => additionalRules.push(
+      addRootImport(options.projectName!, ({code, external}) => code`${external(name, file)}${moduleFunction}`)
+    );
 
-    /**
-     * Add import to the main module
-     *
-     * @param name
-     * @param file
-     * @param moduleFunction
-     */
-    const addImportToModuleFile = (name: string, file: string, moduleFunction?: string) => {
-      if (new RegExp(name).test(appModuleFile.substr(moduleIndex))) {
-        context.logger.warn(`Skipped ${name} (already imported)`);
-        return;
-      }
-      addImportToModule(sourceFile, moduleFilePath, name, file)
-        .forEach((change) => {
-          if (change instanceof InsertChange) {
-            recorder.insertLeft(change.pos, moduleFunction && change.pos > moduleIndex ? change.toAdd.replace(name, name + moduleFunction) : change.toAdd);
-          }
-        });
-    };
+    const insertImportToModuleFile = (name: string, file: string, isDefault?: boolean) =>
+      o3rInsertImportToModuleFile(name, file, sourceFile, recorder, moduleFilePath, isDefault);
 
-    /**
-     * Add providers to the main module
-     *
-     * @param name
-     * @param file
-     * @param customProvider
-     */
-    const addProviderToModuleFile = (name: string, file: string, customProvider?: string) => {
-      if (new RegExp(name).test(appModuleFile.substr(moduleIndex))) {
-        context.logger.warn(`Skipped ${name} (already provided)`);
-        return;
-      }
-      addProviderToModule(sourceFile, moduleFilePath, name, file)
-        .forEach((change) => {
-          if (change instanceof InsertChange) {
-            recorder.insertLeft(change.pos, customProvider && change.pos > moduleIndex ? change.toAdd.replace(name, customProvider) : change.toAdd);
-          }
-        });
-    };
+    const addProviderToModuleFile = (name: string, file: string, customProvider: string) => additionalRules.push(
+      addRootProvider(options.projectName!, ({code, external}) =>
+        code`{provide: ${external(name, file)}, ${customProvider}}`)
+    );
 
-    /**
-     * Add custom code before the module definition
-     *
-     * @param line
-     */
-    const insertBeforeModule = (line: string) => {
-      recorder.insertLeft(moduleIndex - 1, `${line}\n\n`);
-    };
+    const insertBeforeModule = (line: string) => o3rInsertBeforeModule(line, sourceFileContent, recorder, moduleIndex);
 
-    addImportToModuleFile('appendPreconnect', '@o3r/apis-manager');
+    insertImportToModuleFile('appendPreconnect', '@o3r/apis-manager', false);
 
-    insertBeforeModule('appendPreconnect(\'https://YOUR_API_ENDPOINT\');');
+    insertBeforeModule('const PROXY_SERVER = \'https://YOUR_API_ENDPOINT\';');
+
+    insertBeforeModule('appendPreconnect(PROXY_SERVER);');
 
     addImportToModuleFile('ApiManagerModule', '@o3r/apis-manager');
 
-    insertBeforeModule('const PROXY_SERVER = \'https://YOUR_API_ENDPOINT\';');
     insertBeforeModule(`
 export function apiManagerFactory(): ApiManager {
   const apiClient = new ApiFetchClient({
@@ -118,7 +71,7 @@ export function apiManagerFactory(): ApiManager {
   return new ApiManager(apiClient);
 }`);
 
-    addProviderToModuleFile('API_TOKEN', '@o3r/apis-manager', '{provide: API_TOKEN, useFactory: apiManagerFactory}');
+    addProviderToModuleFile('API_TOKEN', '@o3r/apis-manager', 'useFactory: apiManagerFactory');
 
     insertImportToModuleFile('ApiManager', '@o3r/apis-manager', false);
     insertImportToModuleFile('ApiFetchClient', '@ama-sdk/core', false);
@@ -128,12 +81,13 @@ export function apiManagerFactory(): ApiManager {
 
     context.logger.info('Please update by hand the placeholders for YOUR_API_ENDPOINT and YOUR_API_KEY!');
 
-    return tree;
+    return chain(additionalRules)(tree, context);
   };
 
   const updateTsConfig: Rule = (tree: Tree, context: SchematicContext) => {
-    const workspaceProject = getProjectFromTree(tree);
+    const workspaceProject = options.projectName ? getWorkspaceConfig(tree)?.projects[options.projectName] : undefined;
     const tsconfig: string | undefined =
+      workspaceProject &&
       workspaceProject.architect &&
       workspaceProject.architect.build &&
       workspaceProject.architect.build.options &&
@@ -144,7 +98,8 @@ export function apiManagerFactory(): ApiManager {
       return tree;
     }
 
-    const tsconfigObj: any = commentJson.parse(tree.read(tsconfig)!.toString());
+    ts.parseConfigFileTextToJson(tsconfig, tree.readText(tsconfig));
+    const tsconfigObj = ts.parseConfigFileTextToJson(tsconfig, tree.readText(tsconfig)).config;
     if (!tsconfigObj.compilerOptions) {
       tsconfigObj.compilerOptions = {};
     }
@@ -158,7 +113,7 @@ export function apiManagerFactory(): ApiManager {
     tsconfigObj.compilerOptions.lib.push('dom');
     tsconfigObj.compilerOptions.lib = tsconfigObj.compilerOptions.lib.reduce((acc: string[], lib: string) => acc.indexOf(lib) >= 0 ? acc : [...acc, lib], []);
 
-    tree.overwrite(tsconfig, commentJson.stringify(tsconfigObj, null, 2));
+    tree.overwrite(tsconfig, JSON.stringify(tsconfigObj, null, 2));
     return tree;
   };
 

@@ -16,13 +16,17 @@ export class LoggerService implements Logger {
   /** Loggers */
   private readonly clients: LoggerClient[];
 
+  /**
+   * Record the recording status to make sure that new clients recording status will be consistent with the service
+   */
+  private recordingState: 'default' | 'resumed' | 'stopped' = 'default';
+
   constructor(@Optional() @Inject(LOGGER_CLIENT_TOKEN) clients?: LoggerClient | LoggerClient[]) {
     this.clients = clients ? (Array.isArray(clients) ? clients : [clients]) : [new ConsoleLogger()];
   }
 
   /**
    * Identify a user.
-   *
    * @param uid Unique identifier for the current user
    * @param vars Addition information about the user
    */
@@ -32,7 +36,6 @@ export class LoggerService implements Logger {
 
   /**
    * Log custom event.
-   *
    * @param name Name of the event to log
    * @param properties Additional properties
    */
@@ -51,9 +54,27 @@ export class LoggerService implements Logger {
   }
 
   /**
+   * Register a new client to the logger service
+   * @param client
+   */
+  public registerClient(client: LoggerClient) {
+    if (this.clients.indexOf(client) > -1) {
+      this.warn(`Client ${client.constructor.name} already registered`);
+      return;
+    }
+    if (this.recordingState === 'resumed') {
+      client.resumeRecording();
+    } else if (this.recordingState === 'stopped') {
+      client.stopRecording();
+    }
+    this.clients.push(client);
+  }
+
+  /**
    * Stop recording.
    */
   public stopClientRecording(): void {
+    this.recordingState = 'stopped';
     this.clients.forEach((client) => client.stopRecording());
   }
 
@@ -61,12 +82,12 @@ export class LoggerService implements Logger {
    * Resume recording.
    */
   public resumeClientRecording(): void {
+    this.recordingState = 'resumed';
     this.clients.forEach((client) => client.resumeRecording());
   }
 
   /**
    * Report an error
-   *
    * @param message
    * @param optionalParams
    */
@@ -76,7 +97,6 @@ export class LoggerService implements Logger {
 
   /**
    * Report a warning
-   *
    * @param message
    * @param optionalParams
    */
@@ -86,7 +106,6 @@ export class LoggerService implements Logger {
 
   /**
    * Log a message
-   *
    * @param message
    * @param optionalParams
    */
@@ -96,7 +115,6 @@ export class LoggerService implements Logger {
 
   /**
    * Log a message
-   *
    * @param message
    * @param optionalParams
    */
@@ -106,7 +124,6 @@ export class LoggerService implements Logger {
 
   /**
    * Log a debug message
-   *
    * @param message
    * @param optionalParams
    */

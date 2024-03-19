@@ -1,8 +1,18 @@
-# Otter configuration
+<h1 align="center">Otter configuration</h1>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/AmadeusITGroup/otter/main/assets/logo/otter.png" alt="Super cute Otter!" width="40%"/>
+</p>
 
 This package is an [Otter Framework Module](https://github.com/AmadeusITGroup/otter/tree/main/docs/core/MODULE.md).
+<br />
+<br />
 
-This module contains configuration related features (CMS compatibility, Configuration override, store and debugging)
+## Description
+
+[![Stable Version](https://img.shields.io/npm/v/@o3r/configuration)](https://www.npmjs.com/package/@o3r/configuration)
+[![Bundle Size](https://img.shields.io/bundlephobia/min/@o3r/configuration?color=green)](https://www.npmjs.com/package/@o3r/configuration)
+
+This module contains configuration-related features (CMS compatibility, configuration override, store and debugging).
 It comes with an integrated ng builder to help you generate configurations supporting the Otter CMS integration.
 
 ## How to install
@@ -11,7 +21,8 @@ It comes with an integrated ng builder to help you generate configurations suppo
 ng add @o3r/configuration
 ```
 
-> **Warning**: this module requires [@o3r/core](https://www.npmjs.com/package/@o3r/core) to be installed.
+> [!WARNING]
+> This module requires [@o3r/core](https://www.npmjs.com/package/@o3r/core) to be installed.
 
 ## Description
 
@@ -22,25 +33,25 @@ application/components.
 ### Component config types
 
 ```
-        
+
     store config
         │                                                               Input config
-        │                                                               (from parent)                                    
+        │                                                               (from parent)
         │                   Component default config                          │
         │                      (in config.ts file)                            │
         │                               │                                     │
         │       overrides               │                                     │
         └──────────────────────────────>│                                     │
-                                        │                                     │ 
+                                        │                                     │
     global config                       │                                     │
-  (no common props)                     │                                     │ 
-        │                               │                                     │ 
-        │                               │                                     │   
-        │       merge                   │                                     │ 
+  (no common props)                     │                                     │
+        │                               │                                     │
+        │                               │                                     │
+        │       merge                   │                                     │
         └──────────────────────────────>│                                     │
                                         │                                     │
-                                        │                                     │ 
-                                        │           overrides                 │  
+                                        │                                     │
+                                        │           overrides                 │
                                         │<────────────────────────────────────
                                         │
                                         ↓
@@ -54,7 +65,8 @@ A component will have to handle different types of configurations.
 - Each **component type** will have a default configuration which will be defined in the _.config.ts_ file associated to the
   component
 
-> **WARNING** the field name 'id' should not be used in the configuration, as we created a unique one for the entity configuration store
+> [!WARNING]
+> The field name 'id' should not be used in the configuration, as we created a unique one for the entity configuration store
 
 #### Configuration coming from config store
 
@@ -83,6 +95,16 @@ A component will have to handle different types of configurations.
 - the second priority is the one by component type set in the store
 - the lowest priority is the default config set on the component (in the config.ts file of the component)
 
+## Generators
+
+Otter framework provides a set of code generators based on [angular schematics](https://angular.io/guide/schematics).
+
+| Schematics                 | Description                                                    | How to use                        |
+| -------------------------- | -------------------------------------------------------------- | --------------------------------- |
+| add                        | Include Otter configuration module in a library / application. | `ng add @o3r/configuration`       |
+| configuration-to-component | Add configuration to an Otter component                        | `ng g configuration-to-component` |
+
+
 ## More details
 
-Find more information in the [documentation](https://github.com/AmadeusITGroup/otter/tree/main/docs/configuraiton/OVERVIEW.md).
+Find more information in the [documentation](https://github.com/AmadeusITGroup/otter/tree/main/docs/configuration/OVERVIEW.md).

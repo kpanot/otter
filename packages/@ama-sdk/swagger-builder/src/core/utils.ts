@@ -1,4 +1,4 @@
-import { existsSync, promises as fs } from 'node:fs';
+import fs from 'node:fs';
 import https from 'node:https';
 import { Validator } from 'jsonschema';
 import { load } from 'js-yaml';
@@ -18,7 +18,6 @@ export const X_VENDOR_CONFLICT_TAG = 'x-generated-from-conflict';
 
 /**
  * Retrieve a remote specification targeted via http(s)
- *
  * @param targetedSwaggerSpec Path to the swagger spec
  * @param currentDirectory Directory from which the SwaggerSpec path is based one
  */
@@ -50,26 +49,24 @@ export async function retrieveRemoteSwagger(targetedSwaggerSpec: string, current
 
 /**
  * Get the path to the targeted swagger spec
- *
  * @param targetedSwaggerSpec Path to the swagger spec
  * @param currentDirectory Directory from which the SwaggerSpec path is based one
  */
 export function getTargetPath(targetedSwaggerSpec: string, currentDirectory: string) {
   const localPath = path.resolve(currentDirectory, targetedSwaggerSpec);
 
-  if (existsSync(localPath)) {
+  if (fs.existsSync(localPath)) {
     return localPath;
   }
 
   const file = (require.resolve.paths(targetedSwaggerSpec) || [])
-    .find((p) => existsSync(path.resolve(p, targetedSwaggerSpec)));
+    .find((p) => fs.existsSync(path.resolve(p, targetedSwaggerSpec)));
 
   return file;
 }
 
 /**
  * Generate a prefix for a specific item
- *
  * @param name Name of the item for which the prefix is needed
  * @param swaggerPath Path to the swagger spec the item come from
  */
@@ -81,7 +78,6 @@ export function calculatePrefix(name: string, swaggerPath?: string) {
 
 /**
  * Get the Swagger Spec wrapper according to the type of swagger spec
- *
  * @param targetedSwaggerSpec Path to the swagger spec
  * @param currentDirectory Directory from which the SwaggerSpec path is based one
  * @param targetType Type of target used for the Swagger Spec
@@ -98,7 +94,7 @@ export async function getTargetInformation(
   const localPath = getTargetPath(targetedSwaggerSpec, currentDirectory);
 
   if (localPath) {
-    const stats = await fs.stat(localPath);
+    const stats = await fs.promises.stat(localPath);
     if (stats.isFile()) {
       const fileType = path.extname(localPath).replace('.', '');
       if (/json/i.test(fileType)) {
@@ -118,7 +114,6 @@ export async function getTargetInformation(
 
 /**
  * Add a tag to a swagger spec object
- *
  * @param swaggerSpec Swagger spec to edit
  * @param tag Tag to add to the Swagger Spec
  */
@@ -145,7 +140,6 @@ export function addTagToSpecObj(swaggerSpec: Partial<Spec>, tag: any): any {
 
 /**
  * Add an item to a swagger spec object
- *
  * @param swaggerSpec Swagger spec to edit
  * @param nodeType Type of item to add (definitions, parameters, responses, ...)
  * @param itemName Name of the item to add
@@ -153,7 +147,7 @@ export function addTagToSpecObj(swaggerSpec: Partial<Spec>, tag: any): any {
  * @param swaggerPath Path to swagger spec the item come from
  * @param ignoreConflict ignore the conflict and keep the original item
  */
-export function addItemToSpecObj(swaggerSpec: Partial<Spec>, nodeType: string, itemName: string, item: any, swaggerPath?: string, ignoreConflict = false
+export function addItemToSpecObj(swaggerSpec: Partial<Spec>, nodeType: keyof Spec, itemName: string, item: any, swaggerPath?: string, ignoreConflict = false
 ): { finalName: string; swaggerSpec: Partial<Spec> } {
   if (!item || !swaggerSpec || !itemName) {
     return { finalName: itemName, swaggerSpec };
@@ -162,10 +156,10 @@ export function addItemToSpecObj(swaggerSpec: Partial<Spec>, nodeType: string, i
   if (!swaggerSpec[nodeType]) {
     swaggerSpec[nodeType] = {
       [itemName]: item
-    };
+    } as any;
   } else {
-    if (!swaggerSpec[nodeType][itemName]) {
-      swaggerSpec[nodeType][itemName] = item;
+    if (!(swaggerSpec[nodeType] as any)[itemName]) {
+      (swaggerSpec[nodeType] as any)[itemName] = item;
     } else if (!ignoreConflict) {
       const newItemName = calculatePrefix(itemName, swaggerPath) + itemName;
       console.warn(`The ${nodeType} "${itemName}"${swaggerPath ? ` from "${swaggerPath}"` : ''} is conflicting, "${newItemName}" will be used instead.`);
@@ -178,7 +172,6 @@ export function addItemToSpecObj(swaggerSpec: Partial<Spec>, nodeType: string, i
 
 /**
  * Add a definition to a swagger spec object
- *
  * @param swaggerSpec Swagger spec to edit
  * @param definitionName Name of the definition to add
  * @param definition Content of the definition
@@ -192,7 +185,6 @@ export function addDefinitionToSpecObj(swaggerSpec: Partial<Spec>, definitionNam
 
 /**
  * Add a response to a swagger spec object
- *
  * @param swaggerSpec Swagger spec to edit
  * @param responseName Name of the response to add
  * @param response Content of the response
@@ -206,7 +198,6 @@ export function addResponseToSpecObj(swaggerSpec: Partial<Spec>, responseName: s
 
 /**
  * Add a parameter to a swagger spec object
- *
  * @param swaggerSpec Swagger spec to edit
  * @param parameterName Name of the parameter to add
  * @param parameter Content of the parameter
@@ -220,7 +211,6 @@ export function addParameterToSpecObj(swaggerSpec: Partial<Spec>, parameterName:
 
 /**
  * Get the validity of a given JSON object
- *
  * @param jsonObject Object to check
  * @param schema Json Schema to apply to the obejct
  * @param errorMessage Error message display to the error
@@ -241,8 +231,8 @@ export function checkJson(jsonObject: object, schema: Record<string, unknown>, e
  */
 export async function getCurrentArtifactVersion(): Promise<string | undefined> {
   const currentPackageJsonPath = path.resolve(process.cwd(), 'package.json');
-  if (existsSync(currentPackageJsonPath)) {
-    const rawPackageJson = await fs.readFile(currentPackageJsonPath, {encoding: 'utf8'});
+  if (fs.existsSync(currentPackageJsonPath)) {
+    const rawPackageJson = await fs.promises.readFile(currentPackageJsonPath, {encoding: 'utf8'});
     return JSON.parse(rawPackageJson).version;
   }
   return undefined;
@@ -250,7 +240,6 @@ export async function getCurrentArtifactVersion(): Promise<string | undefined> {
 
 /**
  * Determine if a pattern is a glob pattern
- *
  * @param pattern Pattern to test
  */
 export function isGlobPattern(pattern: string) {
