@@ -6399,8 +6399,8 @@ __metadata:
     "@typescript-eslint/eslint-plugin": "npm:^7.2.0"
     "@typescript-eslint/parser": "npm:^7.2.0"
     "@typescript-eslint/types": "npm:^7.2.0"
-    ag-grid-angular: "npm:~31.0.3"
-    ag-grid-community: "npm:~31.0.3"
+    ag-grid-angular: "npm:~31.3.0"
+    ag-grid-community: "npm:~31.3.0"
     archiver: "npm:^6.0.1"
     bootstrap: "npm:5.3.2"
     chokidar: "npm:^3.5.2"
@@ -7409,8 +7409,8 @@ __metadata:
     "@typescript-eslint/parser": "npm:^7.2.0"
     "@typescript-eslint/types": "npm:^7.2.0"
     "@yarnpkg/sdks": "npm:^3.0.0"
-    ag-grid-angular: "npm:~31.0.3"
-    ag-grid-community: "npm:~31.0.3"
+    ag-grid-angular: "npm:~31.3.0"
+    ag-grid-community: "npm:~31.3.0"
     babel-loader: "npm:^9.0.0"
     bootstrap: "npm:5.3.2"
     bootstrap-icons: "npm:^1.11.3"
@@ -8160,8 +8160,8 @@ __metadata:
     "@typescript-eslint/eslint-plugin": "npm:^7.2.0"
     "@typescript-eslint/parser": "npm:^7.2.0"
     "@typescript-eslint/types": "npm:^7.2.0"
-    ag-grid-angular: "npm:~31.0.3"
-    ag-grid-community: "npm:~31.0.3"
+    ag-grid-angular: "npm:~31.3.0"
+    ag-grid-community: "npm:~31.3.0"
     bootstrap: "npm:5.3.2"
     concurrently: "npm:^8.0.0"
     eslint: "npm:^8.57.0"
@@ -12723,23 +12723,23 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ag-grid-angular@npm:~31.0.3":
-  version: 31.0.3
-  resolution: "ag-grid-angular@npm:31.0.3"
+"ag-grid-angular@npm:~31.3.0":
+  version: 31.3.1
+  resolution: "ag-grid-angular@npm:31.3.1"
   dependencies:
-    ag-grid-community: "npm:~31.0.3"
     tslib: "npm:^2.3.0"
   peerDependencies:
     "@angular/common": ">= 14.0.0"
     "@angular/core": ">= 14.0.0"
-  checksum: 10/fed5c5e2ea33cfc23e9516a644ef111bbbfa4da13f26ff8e9499ff57bf930cd0e058394db41946dba821cfc4f3788e4c18df089108ea55c328fe59d85b0a0319
+    ag-grid-community: 31.3.1
+  checksum: 10/db292346e30a1c12145c8c0a7d4ffc4d474cb57d148fc80ffd540285f0f97157f2ca7859c245a3e65cd7eb1d72bacc62607d14175a6490f63bfd5d05d91b29ad
   languageName: node
   linkType: hard
 
-"ag-grid-community@npm:~31.0.3":
-  version: 31.0.3
-  resolution: "ag-grid-community@npm:31.0.3"
-  checksum: 10/f1658691b7689873e5deca1d9172b78106dc57e83db4d50d235fa167d54b98881bb29880eb864f05c03a4fa5cfa727efa2c8b4e85df427d3cc17829acec579c6
+"ag-grid-community@npm:~31.3.0":
+  version: 31.3.1
+  resolution: "ag-grid-community@npm:31.3.1"
+  checksum: 10/6022548c1c19365ade84538f196e0f1e664cd8e65fcf37c21aa61275cf74bff349e705999d260ebf9e06493cc581029c0fd980f02cc17a9216bb1710e9140a63
   languageName: node
   linkType: hard
 
