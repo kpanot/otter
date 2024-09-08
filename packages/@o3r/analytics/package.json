@@ -108,7 +108,7 @@
     "type-fest": "^4.10.2",
     "typescript": "~5.4.2",
     "webpack": "~5.90.0",
-    "zone.js": "~0.14.2"
+    "zone.js": "~0.15.0"
   },
   "exports": {
     "./plugins/webpack": {
