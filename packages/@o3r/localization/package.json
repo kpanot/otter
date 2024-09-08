@@ -151,7 +151,7 @@
     "type-fest": "^4.10.2",
     "typescript": "~5.4.2",
     "unionfs": "~4.5.1",
-    "zone.js": "~0.14.2"
+    "zone.js": "~0.15.0"
   },
   "engines": {
     "node": ">=18.0.0"
