@@ -48,7 +48,7 @@
     "@o3r/schematics": "workspace:^",
     "@schematics/angular": "~17.3.0",
     "rxjs": "^7.8.1",
-    "sass": "~1.72.0"
+    "sass": "~1.80.0"
   },
   "peerDependenciesMeta": {
     "@angular-devkit/architect": {
@@ -140,11 +140,11 @@
     "jest-junit": "~16.0.0",
     "jest-preset-angular": "~14.0.3",
     "jsonc-eslint-parser": "~2.4.0",
-    "memfs": "~4.7.0",
+    "memfs": "~4.14.0",
     "nx": "~18.1.0",
     "pid-from-port": "^1.1.3",
     "rxjs": "^7.8.1",
-    "sass": "~1.72.0",
+    "sass": "~1.80.0",
     "semver": "^7.5.2",
     "stylelint": "^16.0.2",
     "stylelint-scss": "^6.0.0",
